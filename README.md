@@ -42,6 +42,7 @@
       <img src="Example/screw.gif" width="150">
     </td>
   </tr>
+</table>
 
 ## Introduction
 
