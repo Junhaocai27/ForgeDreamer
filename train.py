@@ -1,21 +1,7 @@
-#
-# Copyright (C) 2023, Inria
-# GRAPHDECO research group, https://team.inria.fr/graphdeco
-# All rights reserved.
-#
-# This software is free for non-commercial, research and evaluation use 
-# under the terms of the LICENSE.md file.
-#
-# For inquiries contact  george.drettakis@inria.fr
-#
-
 import random
 import imageio
 import os
 import re
-# os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
-# 禁用 tokenizers 并行处理警告
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import torch
 import torch.nn as nn
@@ -43,38 +29,30 @@ except ImportError:
 
 
 def adjust_text_embeddings(embeddings, azimuth, guidance_opt):
-    #TODO: add prenerg functions
     text_z_list = []
     weights_list = []
     K = 0
-    #for b in range(azimuth):
+
     if guidance_opt.fixed_view:
-        # 固定视角，使用随机生成的文本嵌入
         text_z_, weights_ = get_pos_neg_text_embeddings_fixed(embeddings, azimuth, guidance_opt)
     else:
-        # 随机生成文本嵌入
         text_z_, weights_ = get_pos_neg_text_embeddings_rand(embeddings, azimuth, guidance_opt)
-    # text_z_, weights_ = get_pos_neg_text_embeddings_fixed(embeddings, azimuth, guidance_opt)
-    # text_z_, weights_ = get_pos_neg_text_embeddings(embeddings, azimuth, guidance_opt)
-    # text_z_, weights_ = get_pos_neg_text_embeddings_rand(embeddings, azimuth, guidance_opt)
+    
     K = max(K, weights_.shape[0])
     text_z_list.append(text_z_)
     weights_list.append(weights_)
 
-    # Interleave text_embeddings from different dirs to form a batch
     text_embeddings = []
     for i in range(K):
         for text_z in text_z_list:
-            # if uneven length, pad with the first embedding
             text_embeddings.append(text_z[i] if i < len(text_z) else text_z[0])
-    text_embeddings = torch.stack(text_embeddings, dim=0) # [B * K, 77, 768]
+    text_embeddings = torch.stack(text_embeddings, dim=0)
 
-    # Interleave weights from different dirs to form a batch
     weights = []
     for i in range(K):
         for weights_ in weights_list:
             weights.append(weights_[i] if i < len(weights_) else torch.zeros_like(weights_[0]))
-    weights = torch.stack(weights, dim=0) # [B * K]
+    weights = torch.stack(weights, dim=0)
     return text_embeddings, weights
 
 def get_pos_neg_text_embeddings_rand(embeddings, azimuth_val, opt):
@@ -85,8 +63,7 @@ def get_pos_neg_text_embeddings_rand(embeddings, azimuth_val, opt):
             r = 1 + azimuth_val / 90
         start_z = embeddings['front']
         end_z = embeddings['side']
-        # if random.random() < 0.3:
-        #     r = r + random.gauss(0, 0.08)
+
         pos_z = r * start_z + (1 - r) * end_z
         text_z = torch.cat([pos_z, embeddings['front'], embeddings['side']], dim=0)
         if r > 0.8:
@@ -106,8 +83,7 @@ def get_pos_neg_text_embeddings_rand(embeddings, azimuth_val, opt):
             r = 1 + (azimuth_val + 90) / 90
         start_z = embeddings['side']
         end_z = embeddings['back']
-        # if random.random() < 0.3:
-        #     r = r + random.gauss(0, 0.08)
+
         pos_z = r * start_z + (1 - r) * end_z
         text_z = torch.cat([pos_z, embeddings['side'], embeddings['front']], dim=0)
         front_neg_w = opt.negative_w 
@@ -128,16 +104,13 @@ def get_pos_neg_text_embeddings_fixed(embeddings, azimuth_val, opt):
         else:
             r = 1 + azimuth_val / 90
             
-        # 🔥 修复：直接创建tensor，避免clone()问题
         r = torch.tensor(float(r), device=device, dtype=torch.float16)
         start_z = embeddings['front']
         end_z = embeddings['side']
-        # if random.random() < 0.3:
-        #     r = r + random.gauss(0, 0.08)
+
         pos_z = r * start_z + (1 - r) * end_z
         text_z = torch.cat([pos_z, embeddings['front'], embeddings['side']], dim=0)
         
-        # 🔥 修复：确保r是标量值用于条件判断
         r_val = r.item()
         if r_val > 0.8:
             front_neg_w = 0.0
@@ -155,16 +128,12 @@ def get_pos_neg_text_embeddings_fixed(embeddings, azimuth_val, opt):
         else:
             r = 1 + (azimuth_val + 90) / 90
         
-        # 🔥 修复：同样的处理
         r = torch.tensor(float(r), device=device, dtype=torch.float16)
         start_z = embeddings['side']
         end_z = embeddings['back']
-        # if random.random() < 0.3:
-        #     r = r + random.gauss(0, 0.08)
         pos_z = r * start_z + (1 - r) * end_z
         text_z = torch.cat([pos_z, embeddings['side'], embeddings['front']], dim=0)
         
-        # 🔥 修复：确保r是标量值用于条件判断
         r_val = r.item()
         front_neg_w = opt.negative_w 
         if r_val > 0.8:
@@ -178,7 +147,6 @@ def get_pos_neg_text_embeddings_fixed(embeddings, azimuth_val, opt):
 
 def prepare_embeddings(guidance_opt, guidance):
     embeddings = {}
-    # text embeddings (stable-diffusion) and (IF)
     embeddings['default'] = guidance.get_text_embeds([guidance_opt.text])
     embeddings['uncond'] = guidance.get_text_embeds([guidance_opt.negative])
 
@@ -189,21 +157,19 @@ def prepare_embeddings(guidance_opt, guidance):
 
 def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
     """
-    自动识别<>触发词并生成视角特定的文本嵌入
+    Automatically identifies <> triggers and generates view-specific text embeddings.
     """
-    # 1. 提取基础触发词
-    base_text = guidance_opt.text  # 例如: "A DSLR photo of <nut>"
+    base_text = guidance_opt.text
     trigger_pattern = r'<([^>]+)>'
     base_triggers = re.findall(trigger_pattern, base_text)
     
     if not base_triggers:
-        print("警告: 文本中未找到<>包裹的触发词，将使用原始文本")
+        print("Warning: No trigger word wrapped in <> found in the text, using the original text.")
         base_trigger = None
     else:
-        base_trigger = base_triggers[0]  # 使用第一个触发词
-        print(f"✅ 检测到基础触发词: <{base_trigger}>")
+        base_trigger = base_triggers[0]
+        print(f"✅ Base trigger detected: <{base_trigger}>")
     
-    # 2. 创建视角特定的文本
     if base_trigger:
         front_text = base_text.replace(f"<{base_trigger}>", f"<{base_trigger}_front>")
         up_text = base_text.replace(f"<{base_trigger}>", f"<{base_trigger}_up>")
@@ -211,17 +177,14 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
         front_text = base_text + ", front view"
         up_text = base_text + ", up view"
     
-    # 打印所有要使用的文本提示
-    print("\n==== 视角特定的文本提示 ====")
-    print(f"原始文本: {base_text}")
-    print(f"前视文本: {front_text}")  
-    print(f"上视文本: {up_text}")
+    print("\n==== View-specific Text Prompts ====")
+    print(f"Original text: {base_text}")
+    print(f"Front view text: {front_text}")  
+    print(f"Up view text: {up_text}")
     print("============================\n")
     
-    # 3. 创建嵌入字典
     embeddings = {}
     
-    # 前视图的嵌入集合
     embeddings_front = {}
     embeddings_front['default'] = guidance.get_text_embeds([front_text])
     embeddings_front['uncond'] = guidance.get_text_embeds([guidance_opt.negative])
@@ -230,7 +193,6 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
         view_text = f"{front_text}, {d} view"
         embeddings_front[d] = guidance.get_text_embeds([view_text])
     
-    # 处理前视图的反向文本
     if isinstance(guidance_opt.inverse_text, list):
         inverse_texts_front = []
         for inv_text in guidance_opt.inverse_text:
@@ -247,7 +209,6 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
             inv_front = guidance_opt.inverse_text + ", front view"
         embeddings_front['inverse_text'] = guidance.get_text_embeds([inv_front])
     
-    # 上视图的嵌入集合
     embeddings_up = {}
     embeddings_up['default'] = guidance.get_text_embeds([up_text])
     embeddings_up['uncond'] = guidance.get_text_embeds([guidance_opt.negative])
@@ -256,7 +217,6 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
         view_text = f"{up_text}, {d} view"
         embeddings_up[d] = guidance.get_text_embeds([view_text])
     
-    # 处理上视图的反向文本
     if isinstance(guidance_opt.inverse_text, list):
         inverse_texts_up = []
         for inv_text in guidance_opt.inverse_text:
@@ -273,7 +233,6 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
             inv_up = guidance_opt.inverse_text + ", up view"
         embeddings_up['inverse_text'] = guidance.get_text_embeds([inv_up])
     
-    # 4. 组合嵌入集合
     view_embeddings = {
         'front': embeddings_front,
         'up': embeddings_up
@@ -283,16 +242,14 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
 
 def select_embeddings_by_camera(view_embeddings, viewpoint_cam):
     """
-    根据相机角度选择合适的嵌入
+    Selects appropriate embeddings based on the camera angle.
     """
-    # 获取相机的极角(倾斜角度)
     polar = getattr(viewpoint_cam, 'delta_polar', 0)
     
-    # 根据delta_polar判断视角类型
-    if polar != 0:  # 非零表示45度视角，使用up触发词
+    if polar != 0:
         current_embeddings = view_embeddings['up']
         view_type = "up"
-    else:  # 为零表示正面视角，使用front触发词
+    else:
         current_embeddings = view_embeddings['front'] 
         view_type = "front"
     
@@ -300,11 +257,10 @@ def select_embeddings_by_camera(view_embeddings, viewpoint_cam):
 
 def guidance_setup_enhanced(guidance_opt):
     """
-    增强版的guidance设置，支持视角特定的触发词
+    Enhanced guidance setup with support for view-specific triggers.
     """
     if guidance_opt.guidance=="SD":
         from guidance.sd_utils_copy_original3 import StableDiffusion
-        # from guidance.sd_utils_copy_original import StableDiffusion
         guidance = StableDiffusion(guidance_opt.g_device, guidance_opt.fp16, guidance_opt.vram_O, 
                                    guidance_opt.t_range, guidance_opt.max_t_range, 
                                    num_train_timesteps=guidance_opt.num_train_timesteps, 
@@ -319,7 +275,6 @@ def guidance_setup_enhanced(guidance_opt):
         for p in guidance.parameters():
             p.requires_grad = False
     
-    # 使用新的嵌入生成函数
     view_embeddings = prepare_embeddings_with_view_triggers(guidance_opt, guidance)
     
     return guidance, view_embeddings
@@ -358,16 +313,13 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
     iter_start = torch.cuda.Event(enable_timing = True)
     iter_end = torch.cuda.Event(enable_timing = True)
 
-    # 设置保存文件夹
     save_folder = os.path.join(dataset._model_path,"train_process/")
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
         print('train_process is in :', save_folder)
     
-    # controlnet
     use_control_net = False
     
-    # 🔥 使用增强版的guidance设置，支持视角特定的触发词
     guidance, view_embeddings = guidance_setup_enhanced(guidance_opt)   
     
     viewpoint_stack = None
@@ -384,12 +336,10 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
         save_process_iter = opt.iterations // len(process_view_points)
         pro_img_frames = []
     
-    # 🔥 为front和up视角分别创建反向文本嵌入
     text_z_inverse_front = torch.cat([view_embeddings['front']['uncond'], view_embeddings['front']['inverse_text']], dim=0)
     text_z_inverse_up = torch.cat([view_embeddings['up']['uncond'], view_embeddings['up']['inverse_text']], dim=0)
 
     for iteration in range(first_iter, opt.iterations + 1):        
-        # DEBUG NETWORK_GUI
         if network_gui.conn == None:
             network_gui.try_connect()
         while network_gui.conn != None:
@@ -412,11 +362,9 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
         gaussians.update_rotation_learning_rate(iteration)
         gaussians.update_scaling_learning_rate(iteration)
         
-        # Every 500 its we increase the levels of SH up to a maximum degree
         if iteration % 500 == 0:
             gaussians.oneupSHdegree()
 
-        # progressively relaxing view range    
         if not opt.use_progressive:                
             if iteration >= opt.progressive_view_iter and iteration % opt.scale_up_cameras_iter == 0:
                 scene.pose_args.fovy_range[0] = max(scene.pose_args.max_fovy_range[0], scene.pose_args.fovy_range[0] * opt.fovy_scale_up_factor[0])
@@ -436,29 +384,17 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
                 print('scale up phi_range to:', scene.pose_args.phi_range)
                 print('scale up fovy_range to:', scene.pose_args.fovy_range)
 
-        # Pick a random Camera
-        # if not viewpoint_stack and not guidance_opt.fixed_view:
-        #     # viewpoint_stack = scene.getRandTrainCameras().copy()
-        #     viewpoint_stack = scene.getCircleVideoCameras(render45=True).copy()     
-        
-        # # 视点栈选择逻辑
         if not viewpoint_stack and guidance_opt.fixed_view:
-            # 前期训练使用标准视角
-            if iteration < opt.warmup_iter:  # 在热身阶段前期使用标准视角
+            if iteration < opt.warmup_iter:
                 viewpoint_stack = scene.getCircleVideoCameras(render45=False).copy()
                 render45_mode = False
-            else:  # 训练后期使用45度倾斜视角
+            else:
                 viewpoint_stack = scene.getCircleVideoCameras(render45=True).copy()
                 render45_mode = True
         else:
-            # 如果视点栈为空且不是固定视角，则使用随机训练相机
             if not viewpoint_stack:
                 viewpoint_stack = scene.getRandTrainCameras().copy()
 
-        # if not viewpoint_stack:
-        #     # viewpoint_stack = scene.getRandomFixedAngleCameras().copy()
-        #     viewpoint_stack = scene.getRandTrainCameras().copy()
-        
         C_batch_size = guidance_opt.C_batch_size
         viewpoint_cams = []
         images = []
@@ -472,32 +408,19 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
             try:
                 viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))            
             except:
-                # 视点栈选择逻辑
                 if guidance_opt.fixed_view:
-                    if iteration < opt.warmup_iter:  # 在热身阶段前期使用标准视角
+                    if iteration < opt.warmup_iter:
                         viewpoint_stack = scene.getCircleVideoCameras(render45=False).copy()
                         render45_mode = False
-                    else:  # 训练后期使用45度倾斜视角
+                    else:
                         viewpoint_stack = scene.getCircleVideoCameras(render45=True).copy()
                         render45_mode = True
                 else:
                     viewpoint_stack = scene.getRandTrainCameras().copy()
-                    # viewpoint_stack = scene.getCircleVideoCameras(render45=True).copy()
-                # viewpoint_stack = scene.getRandomFixedAngleCameras().copy()
-                # viewpoint_stack = scene.getRandTrainCameras().copy()
                 viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))
 
-        # for i in range(C_batch_size):
-        #     try:
-        #         viewpoint_cam = viewpoint_stack.pop()  # 默认从末尾pop，也可以用pop(0)从开头pop
-        #     except:
-        #         viewpoint_stack = scene.getRandTrainCameras().copy()
-        #         viewpoint_cam = viewpoint_stack.pop()  # 同样改为顺序pop
-                
-            # 🔥 关键修改：根据相机角度选择嵌入
             current_embeddings, view_type = select_embeddings_by_camera(view_embeddings, viewpoint_cam)
             
-            # pred text_z
             azimuth = viewpoint_cam.delta_azimuth
             text_z = [current_embeddings['uncond']]
 
@@ -525,7 +448,6 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
             text_z = torch.cat(text_z, dim=0)
             text_z_.append(text_z)
 
-            # Render
             if (iteration - 1) == debug_from:
                 pipe.debug = True
             render_pkg = render(viewpoint_cam, gaussians, pipe, background, 
@@ -540,13 +462,12 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
             images.append(image)
             depths.append(depth)
             alphas.append(alpha)
-            viewpoint_cams.append(viewpoint_cam)  # 修正：应该添加viewpoint_cam而不是viewpoint_cams
+            viewpoint_cams.append(viewpoint_cam)
 
         images = torch.stack(images, dim=0)
         depths = torch.stack(depths, dim=0)
         alphas = torch.stack(alphas, dim=0)
 
-        # Loss
         warm_up_rate = 1. - min(iteration/opt.warmup_iter,1.)
         guidance_scale = guidance_opt.guidance_scale
         _aslatent = False
@@ -555,8 +476,6 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
         if iteration > opt.use_control_net_iter and (random.random() < guidance_opt.controlnet_ratio):
             use_control_net = True
             
-        # 🔥 根据batch中主要的视角类型选择反向文本嵌入
-        # 简化处理：使用第一个相机的视角类型来决定
         first_cam_embeddings, first_view_type = select_embeddings_by_camera(view_embeddings, viewpoint_cams[0])
         text_z_inverse = text_z_inverse_front if first_view_type == "front" else text_z_inverse_up
             
@@ -568,12 +487,6 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
                                                 weights = torch.stack(weights_, dim=1), resolution=(gcams.image_h, gcams.image_w),
                                                 guidance_opt=guidance_opt,as_latent=_aslatent, embedding_inverse = text_z_inverse, opt=opt)
             
-            # loss = guidance.train_step_perpneg(torch.stack(text_z_, dim=1), images, 
-            #                                     pred_depth=depths, pred_alpha=alphas,
-            #                                     grad_scale=guidance_opt.lambda_guidance,
-            #                                     use_control_net = use_control_net ,save_folder = save_folder,  iteration = iteration, warm_up_rate=warm_up_rate, 
-            #                                     weights = torch.stack(weights_, dim=1), resolution=(gcams.image_h, gcams.image_w),
-            #                                     guidance_opt=guidance_opt,as_latent=_aslatent, embedding_inverse = text_z_inverse)
         else:
             loss = guidance.train_step(torch.stack(text_z_, dim=1), images, 
                                     pred_depth=depths, pred_alpha=alphas,
@@ -592,7 +505,6 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
         iter_end.record()
 
         with torch.no_grad():
-            # Progress bar
             ema_loss_for_log = 0.4 * loss.item() + 0.6 * ema_loss_for_log
             if opt.save_process:
                 if iteration % save_process_iter == 0 and len(process_view_points) > 0:
@@ -609,7 +521,6 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
             if iteration == opt.iterations:
                 progress_bar.close()
 
-            # Log and save
             training_report(tb_writer, iteration, iter_start.elapsed_time(iter_end), testing_iterations, scene, render, (pipe, background))
             if (iteration in testing_iterations):
                 if save_video:
@@ -619,9 +530,7 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
 
-            # Densification
             if iteration < opt.densify_until_iter:
-                # Keep track of max radii in image-space for pruning
                 gaussians.max_radii2D[visibility_filter] = torch.max(gaussians.max_radii2D[visibility_filter], radii[visibility_filter])
                 gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
 
@@ -632,7 +541,6 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
                 if iteration % opt.opacity_reset_interval == 0:
                     gaussians.reset_opacity()
 
-            # Optimizer step
             if iteration < opt.iterations:
                 gaussians.optimizer.step()
                 gaussians.optimizer.zero_grad(set_to_none = True)
@@ -652,18 +560,15 @@ def prepare_output_and_logger(args):
             unique_str = str(uuid.uuid4())
         args._model_path = os.path.join("./output/", args.workspace)
         
-    # Set up output folder
     print("Output folder: {}".format(args._model_path))
     os.makedirs(args._model_path, exist_ok = True)
 
-    # copy configs
     if args.opt_path is not None:
         os.system(' '.join(['cp', args.opt_path, os.path.join(args._model_path, 'config.yaml')]))
 
     with open(os.path.join(args._model_path, "cfg_args"), 'w') as cfg_log_f:
         cfg_log_f.write(str(Namespace(**vars(args))))
 
-    # Create Tensorboard writer
     tb_writer = None
     if TENSORBOARD_FOUND:
         tb_writer = SummaryWriter(args._model_path)
@@ -674,12 +579,12 @@ def prepare_output_and_logger(args):
 def training_report(tb_writer, iteration, elapsed, testing_iterations, scene : Scene, renderFunc, renderArgs):
     if tb_writer:
         tb_writer.add_scalar('iter_time', elapsed, iteration)
-    # Report test and samples of training set
+
     if iteration in testing_iterations:
         save_folder = os.path.join(scene.args._model_path,"test_six_views/{}_iteration".format(iteration))
         if not os.path.exists(save_folder):
-            os.makedirs(save_folder)  # makedirs 创建文件时如果路径不存在会创建这个路径
-            print('test views is in :', save_folder)
+            os.makedirs(save_folder)
+            print('Test views are in:', save_folder)
         torch.cuda.empty_cache()
         config = ({'name': 'test', 'cameras' : scene.getTestCameras()})
         if config['cameras'] and len(config['cameras']) > 0:
@@ -705,8 +610,8 @@ def video_inference(iteration, scene : Scene, renderFunc, renderArgs):
 
     save_folder = os.path.join(scene.args._model_path,"videos/{}_iteration".format(iteration))
     if not os.path.exists(save_folder):
-        os.makedirs(save_folder)  # makedirs 
-        print('videos is in :', save_folder)
+        os.makedirs(save_folder)
+        print('Videos are in:', save_folder)
     torch.cuda.empty_cache()
     config = ({'name': 'test', 'cameras' : scene.getCircleVideoCameras()})
     if config['cameras'] and len(config['cameras']) > 0:
@@ -727,8 +632,6 @@ def video_inference(iteration, scene : Scene, renderFunc, renderArgs):
             image = image.detach().cpu().permute(1,2,0).numpy()
             image = (image * 255).round().astype('uint8')
             img_frames.append(image)    
-            #save_image(image,os.path.join(save_folder,"lora_view_{}.jpg".format(viewpoint.uid)))   
-        # Img to Numpy
         imageio.mimwrite(os.path.join(save_folder, "video_rgb_{}.mp4".format(iteration)), img_frames, fps=30, quality=8)
         if len(depth_frames) > 0:
             imageio.mimwrite(os.path.join(save_folder, "video_depth_{}.mp4".format(iteration)), depth_frames, fps=30, quality=8)
@@ -739,9 +642,6 @@ def video_inference(iteration, scene : Scene, renderFunc, renderArgs):
 if __name__ == "__main__":
     import yaml
 
-    # os.environ['CUDA_VISIBLE_DEVICES'] = ''
-
-    # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
 
     parser.add_argument('--opt', type=str, default='/home/s414e2/CJH/Text-to-3D/LucidDreamer/configs/screw_lora.yaml')
@@ -750,13 +650,12 @@ if __name__ == "__main__":
     parser.add_argument('--debug_from', type=int, default=-1)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--detect_anomaly', action='store_true', default=False)
-    parser.add_argument("--test_ratio", type=int, default=5) # [2500,5000,7500,10000,12000]
-    parser.add_argument("--save_ratio", type=int, default=2) # [10000,12000]
+    parser.add_argument("--test_ratio", type=int, default=5)
+    parser.add_argument("--save_ratio", type=int, default=2)
     parser.add_argument("--save_video", type=bool, default=False)
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--checkpoint_iterations", nargs="+", type=int, default=[])
     parser.add_argument("--start_checkpoint", type=str, default = None)
-    # parser.add_argument("--device", type=str, default='cuda')
 
     lp = ModelParams(parser)
     op = OptimizationParams(parser)
@@ -781,12 +680,10 @@ if __name__ == "__main__":
         args.seed = opts.get('seed', 0)
         args.device = opts.get('device', 'cuda')
 
-        # override device
         gp.g_device = args.device
         lp.data_device = args.device
         gcp.device = args.device
 
-    # save iterations
     test_iter = [1] + [k * op.iterations // args.test_ratio for k in range(1, args.test_ratio)] + [op.iterations]
     args.test_iterations = test_iter
 
@@ -798,12 +695,9 @@ if __name__ == "__main__":
 
     print("Optimizing " + lp._model_path)
 
-    # Initialize system state (RNG)
     safe_state(args.quiet, seed=args.seed)
-    # Start GUI server, configure and run training
     network_gui.init(args.ip, args.port)
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
     training(lp, op, pp, gcp, gp, args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from, args.save_video)
 
-    # All done
     print("\nTraining complete.")
