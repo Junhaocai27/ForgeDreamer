@@ -7,7 +7,7 @@
   <tr>
     <td align="center">
       <b>Bearing</b><br>
-      <img src="[ForgeDreamer/Example/bearing.gif](https://github.com/Junhaocai27/ForgeDreamer/blob/main/Example/bearing.gif)" width="260">
+      <img src="Example/bearing.gif" width="260">
     </td>
     <td align="center">
       <b>Gasket</b><br>
