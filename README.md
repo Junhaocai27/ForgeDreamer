@@ -1,5 +1,6 @@
 # ForgeDreamer
 ## Example
+<div align="center">
 <h3 align="center">Generated 3D Models Showcase</h3>
 
 <table>
@@ -43,6 +44,7 @@
     </td>
   </tr>
 </table>
+</div>
 
 ## Introduction
 
