@@ -3,7 +3,7 @@
 <h3 align="center">Generated 3D Models Showcase</h3>
 
 <table>
-  <!-- 第一行 -->
+  <!-- First row -->
   <tr>
     <td align="center">
       <b>Bearing</b><br>
@@ -17,9 +17,13 @@
       <b>Green LED</b><br>
       <img src="Example/green_LED.gif" width="150">
     </td>
+    <td align="center">
+      <b>Resistor</b><br>
+      <img src="Example/resistor.gif" width="150">
+    </td>
   </tr>
   
-  <!-- 第二行 -->
+  <!-- Second row -->
   <tr>
     <td align="center">
       <b>Red LED</b><br>
@@ -33,24 +37,11 @@
       <b>Nut</b><br>
       <img src="Example/nut.gif" width="150">
     </td>
-  </tr>
-  
-  <!-- 第三行 -->
-  <tr>
-    <td align="center">
-      <b>Resistor</b><br>
-      <img src="Example/resistor.gif" width="150">
-    </td>
     <td align="center">
       <b>Screw</b><br>
       <img src="Example/screw.gif" width="150">
     </td>
-    <td align="center">
-      <b>Nut and Screw</b><br>
-      <img src="Example/nut_screw.gif" width="150">
-    </td>
   </tr>
-</table>
 
 ## Introduction
 
