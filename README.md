@@ -1,4 +1,57 @@
 # ForgeDreamer
+## Example
+<h3 align="center">Generated 3D Models Showcase</h3>
+
+<table>
+  <!-- 第一行 -->
+  <tr>
+    <td align="center">
+      <b>Bearing</b><br>
+      <img src="ForgeDreamer/Example/bearing.gif" width="260">
+    </td>
+    <td align="center">
+      <b>Gasket</b><br>
+      <img src="ForgeDreamer/Example/gasket.gif" width="260">
+    </td>
+    <td align="center">
+      <b>Green LED</b><br>
+      <img src="ForgeDreamer/Example/green_LED.gif" width="260">
+    </td>
+  </tr>
+  
+  <!-- 第二行 -->
+  <tr>
+    <td align="center">
+      <b>Red LED</b><br>
+      <img src="ForgeDreamer/Example/red_LED.gif" width="260">
+    </td>
+    <td align="center">
+      <b>Nail</b><br>
+      <img src="ForgeDreamer/Example/nail.gif" width="260">
+    </td>
+    <td align="center">
+      <b>Nut</b><br>
+      <img src="ForgeDreamer/Example/nut.gif" width="260">
+    </td>
+  </tr>
+  
+  <!-- 第三行 -->
+  <tr>
+    <td align="center">
+      <b>Resistor</b><br>
+      <img src="ForgeDreamer/Example/resistor.gif" width="260">
+    </td>
+    <td align="center">
+      <b>Screw</b><br>
+      <img src="ForgeDreamer/Example/screw.gif" width="260">
+    </td>
+    <td align="center">
+      <b>Nut and Screw</b><br>
+      <img src="ForgeDreamer/Example/nut_screw.gif" width="260">
+    </td>
+  </tr>
+</table>
+
 ## Introduction
 
 This repository contains the code to run two different training tasks. Each task requires a separate Conda environment to manage its dependencies. Please follow the instructions below to set up the environments and run the training scripts.
