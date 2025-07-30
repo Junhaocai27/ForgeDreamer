@@ -69,8 +69,3 @@ conda activate ForgeDreamer
 # Run the second training script
 sh train.sh
 ```
-
-
-## License
-
-This project is licensed under the [MIT](LICENSE) License.
