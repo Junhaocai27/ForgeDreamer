@@ -14,23 +14,25 @@ safetensors==0.5.3
 xformers==0.0.27
 
 # === 4. 图像、视频与科学计算 ===
-Pillow
-opencv-python
+Pillow==11.2.1
+opencv-python==4.11.0.86
 imageio==2.31.1
-imageio-ffmpeg
-scipy
+imageio-ffmpeg==0.6.0
+scipy==1.13.1
+numpy>=1.23.0  # 强制使用支持 Python 3.10 的免编译版本
+pandas>=1.5.0  # 强制使用支持 Python 3.10 的免编译版本
 
 # === 5. 实用工具与杂项 ===
 pip==26.0.1
-tqdm
-mediapipe
+tqdm==4.67.1
+mediapipe==0.10.21
 fire==0.5.0
-PyYAML
-wandb
-triton
-gradio
+PyYAML==6.0.2
+wandb==0.20.1
+triton==2.3.1
+gradio  # 注意：在你提供的参考列表中未找到 gradio 的版本号，因此保留原样
 plyfile==0.8.1
-ftfy
-tensorboard
-dhg # 需要搭配当前的 torch 2.3.1+cu121
-einops
+ftfy==6.3.1
+tensorboard==2.19.0
+# dhg==0.9.5 # 需要搭配当前的 torch 2.3.1+cu121
+einops==0.8.1

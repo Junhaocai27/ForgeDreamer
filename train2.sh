@@ -1,5 +1,5 @@
-export CUDA_VISIBLE_DEVICES="1"
-python /root/LucidDreamer/train_AAAI1.py --opt '/root/LucidDreamer/configs/new_experiment/bagel/bagel.yaml'
+export CUDA_VISIBLE_DEVICES="0"
+python /root/LucidDreamer/train_AAAI1.py --opt '/root/ForgeDreamer/configs/screw.yaml'
 # python /root/LucidDreamer/train_AAAI1.py --opt '/root/LucidDreamer/configs/new_experiment/nut/nut1_SDS.yaml'
 #python /root/LucidDreamer/train_AAAI1.py --opt '/root/LucidDreamer/configs/new_experiment/gasket/gasket4.yaml'
 #python /root/LucidDreamer/train_AAAI1.py --opt '/root/LucidDreamer/configs/new_experiment/hex/hex2.yaml'

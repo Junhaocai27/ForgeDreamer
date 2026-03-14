@@ -1,6 +1,6 @@
 export MODEL_NAME="/root/stable-diffusion-2-1-base"
 export INSTANCE_DIR="/root/lora_train_imgs/lora_yellow_light_diode_up"
-export OUTPUT_DIR="/root/lora_weight_before_distill/yellow_light_diode_up_new1"
+export OUTPUT_DIR="/root/lora_weight_before_distill/yellow_light_diode_up_new2"
 
 lora_pti \
   --pretrained_model_name_or_path=$MODEL_NAME  \
@@ -31,7 +31,7 @@ lora_pti \
   --weight_decay_lora=0.001\
   --continue_inversion \
   --continue_inversion_lr=1e-4 \
-  --device="cuda:3" \
+  --device="cuda:0" \
   --lora_rank=16 \
   --lora_clip_target_modules="{'CLIPSdpaAttention'}" \
   # --log_wandb
