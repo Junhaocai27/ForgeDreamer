@@ -4,9 +4,3 @@
 [submodule "submodules/simple-knn"]
 	path = submodules/simple-knn
 	url = https://github.com/YixunLiang/simple-knn.git
-[submodule "point-e"]
-	path = point-e
-	url = https://github.com/openai/point-e.git
-[submodule "CLIP"]
-	path = CLIP
-	url = https://github.com/openai/CLIP.git
