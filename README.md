@@ -96,5 +96,4 @@ pip install dhg==0.9.5 --no-deps
 # 5. Install custom submodules and local packages
 pip install submodules/diff-gaussian-rasterization --no-build-isolation
 pip install submodules/simple-knn/ --no-build-isolation
-pip install ./point-e --no-build-isolation
 pip install ./LoRA_Distillation --no-build-isolation
