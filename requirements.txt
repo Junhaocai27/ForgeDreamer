@@ -1,7 +1,7 @@
 # === 1. 指定 PyTorch 官方 CUDA 12.1 镜像源 ===
 --extra-index-url https://download.pytorch.org/whl/cu121
 
-# === 2. 核心深度学习框架 (已更新为 2.3.1+cu121) ===
+# === 2. 核心深度学习框架 ===
 torch==2.3.1+cu121
 torchvision==0.18.1+cu121
 
@@ -16,11 +16,13 @@ xformers==0.0.27
 # === 4. 图像、视频与科学计算 ===
 Pillow==11.2.1
 opencv-python==4.11.0.86
+opencv-contrib-python==4.11.0.86  # 锁定此项以解决 mediapipe 的回溯问题
 imageio==2.31.1
 imageio-ffmpeg==0.6.0
 scipy==1.13.1
-numpy>=1.23.0  # 强制使用支持 Python 3.10 的免编译版本
-pandas>=1.5.0  # 强制使用支持 Python 3.10 的免编译版本
+scikit-image==0.22.0              # 锁定此项以解决 point-e 的回溯问题
+numpy==1.26.4                     # 锁定确切版本，加速依赖解析
+pandas==2.3.3                     # 锁定确切版本
 
 # === 5. 实用工具与杂项 ===
 pip==26.0.1
@@ -30,10 +32,12 @@ fire==0.5.0
 PyYAML==6.0.2
 wandb==0.20.1
 triton==2.3.1
-gradio  # 注意：在你提供的参考列表中未找到 gradio 的版本号，因此保留原样
+gradio==5.38.2                    # 锁定兼容的最终版本，防止几十次的降级尝试
+gradio-client==1.11.0             # 显式锁定对应的 client 版本
 plyfile==0.8.1
 ftfy==6.3.1
-tensorboard==2.19.0
-# dhg==0.9.5 # 需要搭配当前的 torch 2.3.1+cu121
+tensorboard==2.19.0 
 einops==0.8.1
+scikit-learn==1.7.2
+optuna==4.7.0
 git+https://github.com/openai/point-e.git
