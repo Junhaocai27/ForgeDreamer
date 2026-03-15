@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional, List, Literal
 
 import warnings
-warnings.filterwarnings("ignore")  # 禁用所有警告
+warnings.filterwarnings("ignore")  # Disable all warnings
 
 import torch
 import torch.nn.functional as F
@@ -121,7 +121,7 @@ def text2img_dataloader_combined_with_latent_caching(
     aux_tokenizer2=None,
     cached_latents: bool = False,
     num_workers: int = 0,
-    # vae_scaling_factor: float = 0.18215 # 可以作为参数传入，或从vae.config获取
+    # vae_scaling_factor: float = 0.18215 # Can be passed as a parameter, or obtained from vae.config
 ):
     """
     Creates a DataLoader, with latent caching directly imitating the non-leaking snippet.
@@ -136,12 +136,12 @@ def text2img_dataloader_combined_with_latent_caching(
         
         print(f"Caching latents for {len(train_dataset)} images (direct imitation)...")
         
-        # 使用 VAE 所在的设备进行操作
+        # Use the device where the VAE resides for operations
         current_vae_device = vae.device 
-        # 获取缩放因子
-        scaling_factor = getattr(vae.config, "scaling_factor", 0.18215) # 与您的"不泄漏"代码一致
+        # Get scaling factor
+        scaling_factor = getattr(vae.config, "scaling_factor", 0.18215) # Consistent with the "no leak" code
 
-        cached_dataset_items = [] # 存储修改后的数据集项
+        cached_dataset_items = [] # Store modified dataset items
 
         for i in tqdm(range(len(train_dataset)), desc="Caching latents (direct imitation)"):
             # 1. Get the original item from the dataset
@@ -153,17 +153,17 @@ def text2img_dataloader_combined_with_latent_caching(
 
             pixel_values = item_from_dataset["instance_images"] 
 
-            # 确保 pixel_values 是张量 (这里不做PIL转换，假设dataset返回的是张量)
+            # Ensure pixel_values is a tensor (no PIL conversion here, assuming dataset returns tensors)
             if not isinstance(pixel_values, torch.Tensor):
                 raise TypeError(
                     f"Expected 'instance_images' to be a torch.Tensor for direct imitation, got {type(pixel_values)}. "
                     "If dataset returns PIL, pre-processing is needed or use the 'fixed' version."
                 )
             
-            # 准备 VAE 输入: 添加批次维度，移动到 VAE 设备，转换数据类型
+            # Prepare VAE input: add batch dimension, move to VAE device, convert data type
             input_pixels_for_vae = pixel_values.unsqueeze(0).to(device=current_vae_device, dtype=vae.dtype)
 
-            # 2. Encode to latents using VAE (在 no_grad 上下文中)
+            # 2. Encode to latents using VAE (within no_grad context)
             with torch.no_grad():
                 latents_on_vae_device = vae.encode(input_pixels_for_vae).latent_dist.sample()
             
@@ -178,14 +178,14 @@ def text2img_dataloader_combined_with_latent_caching(
             # 5. Add the MODIFIED item to the list
             cached_dataset_items.append(item_from_dataset)
 
-            # 注意：这里不添加显式的 del 或 torch.cuda.empty_cache()，严格模仿
+            # Note: no explicit del or torch.cuda.empty_cache() here, strictly mimicking
         
         dataset_to_load = cached_dataset_items
         print("Latent caching (direct imitation) complete.")
     else:
         print("Using pixel values directly from the dataset (no latent caching).")
 
-    # --- Collate function (与之前版本相同) ---
+    # --- Collate function (same as previous version) ---
     def collate_fn(examples):
         batch = {}
         if not examples:
@@ -282,26 +282,26 @@ def loss_step_gaussian_noise(
     t_mutliplier=1.0,
     mixed_precision=False,
     mask_temperature=1.0,
-    # 新增参数：用于标识当前teacher和保存目录
+    # Additional parameters: for identifying the current teacher and save directory
     current_teacher_name: str = "teacher",
     current_teacher_idx: int = 0,
     base_save_dir: str = None,
-    save_comparison_grid: bool = False,  # 是否保存对比网格图
+    save_comparison_grid: bool = False,  # Whether to save comparison grid image
 ):
     """
-    计算高斯噪声预测损失并保存学生模型的预测结果
+    Compute Gaussian noise prediction loss and save student model prediction results
     
-    新增功能：
-    - 按teacher分类保存预测结果
-    - 为每个teacher创建独立的保存目录
-    - 在文件名中包含teacher信息
-    - 可选的对比网格图保存
+    New features:
+    - Save prediction results categorized by teacher
+    - Create independent save directory for each teacher
+    - Include teacher information in file names
+    - Optional comparison grid image saving
     
     Args:
-        current_teacher_name: 当前teacher的名称
-        current_teacher_idx: 当前teacher的索引
-        base_save_dir: 基础保存目录（如果为None，使用output_dir_for_loss_step）
-        save_comparison_grid: 是否保存包含所有对比的网格图
+        current_teacher_name: Name of the current teacher
+        current_teacher_idx: Index of the current teacher
+        base_save_dir: Base save directory (if None, uses output_dir_for_loss_step)
+        save_comparison_grid: Whether to save grid image containing all comparisons
     """
     weight_dtype = torch.float32
     if mixed_precision:
@@ -309,7 +309,7 @@ def loss_step_gaussian_noise(
     else:
         vae_decode_input_dtype = torch.float32
 
-    # 处理潜变量
+    # Process latent variables
     if batch["pixel_values"].ndim == 4 and batch["pixel_values"].shape[1] in [1, 3, 4]:
         latents_gt_x0 = batch["pixel_values"].to(device=student_unet.device, dtype=weight_dtype)
     else:
@@ -317,7 +317,7 @@ def loss_step_gaussian_noise(
 
     bsz = latents_gt_x0.shape[0]
 
-    # 为每张图片采样一个随机的时间步
+    # Sample a random timestep for each image
     timesteps = torch.randint(
         0,
         int(scheduler.config.num_train_timesteps * t_mutliplier),
@@ -326,17 +326,17 @@ def loss_step_gaussian_noise(
     )
     timesteps = timesteps.long()
 
-    # 采样噪声
+    # Sample noise
     noise = torch.randn_like(latents_gt_x0)
     noisy_latents = scheduler.add_noise(latents_gt_x0, noise, timesteps)
 
-    # 准备UNet输入
+    # Prepare UNet input
     if mixed_precision:
         student_unet_input_latents = noisy_latents.to(dtype=torch.float16)
     else:
         student_unet_input_latents = noisy_latents.to(dtype=torch.float32)
 
-    # --- 学生模型文本编码部分 ---
+    # --- Student model text encoding section ---
     student_input_ids = batch.get("aux1_input_ids")
     if student_input_ids is None:
         student_input_ids = batch["input_ids"]
@@ -350,7 +350,7 @@ def loss_step_gaussian_noise(
     if hasattr(student_text_encoder, 'dtype') and student_text_encoder.dtype == torch.float16:
          student_text_encoder_output_dtype_for_autocast = torch.float16
 
-    # 文本编码（支持混合精度）
+    # Text encoding (supports mixed precision)
     if mixed_precision and student_text_encoder_output_dtype_for_autocast == torch.float16:
         with torch.cuda.amp.autocast(enabled=True):
             student_encoder_hidden_states = student_text_encoder(
@@ -363,7 +363,7 @@ def loss_step_gaussian_noise(
         unet_expected_dtype = student_unet.dtype if hasattr(student_unet, 'dtype') else weight_dtype
         student_encoder_hidden_states = _temp_states.to(dtype=unet_expected_dtype)
 
-    # --- 学生模型UNet预测噪声 ---
+    # --- Student model UNet noise prediction ---
     student_unet_internal_dtype = student_unet.dtype if hasattr(student_unet, 'dtype') else weight_dtype
     student_encoder_hidden_states_for_unet = student_encoder_hidden_states.to(dtype=student_unet_internal_dtype)
 
@@ -383,13 +383,13 @@ def loss_step_gaussian_noise(
 
     target_noise = noise
 
-    # 处理mask（如果存在）
+    # Process mask (if exists)
     if batch.get("mask", None) is not None:
         mask = batch["mask"].to(student_pred_noise.device)
         if mask.ndim == 3:
             mask = mask.unsqueeze(1)
         elif mask.ndim != 4 or mask.shape[1] != 1:
-            raise ValueError(f"Mask 形状异常: {mask.shape}. 期望 [B, 1, H, W] 或 [B, H, W]")
+            raise ValueError(f"Mask shape error: {mask.shape}. Expected [B, 1, H, W] or [B, H, W]")
 
         mask = (mask + 0.01).pow(mask_temperature)
         mask = mask / mask.max()
@@ -398,10 +398,10 @@ def loss_step_gaussian_noise(
         student_pred_noise = student_pred_noise * mask
         target_noise = target_noise * mask
 
-    # 计算损失
+    # Compute loss
     loss = F.mse_loss(student_pred_noise.float(), target_noise.float(), reduction="none").mean([1, 2, 3]).mean()
 
-    # --- 优化的保存逻辑 ---
+    # --- Optimized save logic ---
     if global_step % save_image_every_n_steps == 0 and save_image_every_n_steps > 0:
         with torch.no_grad():
             latents_gt_x0_viz = latents_gt_x0[0:1].detach()
@@ -411,7 +411,7 @@ def loss_step_gaussian_noise(
 
             current_timestep_int = timestep_viz.item() if timestep_viz.numel() == 1 else timestep_viz[0].item()
 
-            # 从学生预测的噪声重构x0
+            # Reconstruct x0 from student predicted noise
             scheduler_output_student = scheduler.step(
                 model_output=student_pred_noise_viz.to(dtype=noisy_latents_viz.dtype),
                 timestep=torch.tensor([current_timestep_int], device=noisy_latents_viz.device) if not isinstance(current_timestep_int, int) else current_timestep_int,
@@ -419,7 +419,7 @@ def loss_step_gaussian_noise(
             )
             pred_x0_latent_student = scheduler_output_student.pred_original_sample
 
-            # VAE解码准备
+            # VAE decoding preparation
             scaling_factor = getattr(vae.config, "scaling_factor", 0.18215)
             pred_x0_latent_student_for_vae = pred_x0_latent_student.to(dtype=vae_decode_input_dtype) / scaling_factor
             latent_x0_gt_viz_for_vae = latents_gt_x0_viz.to(dtype=vae_decode_input_dtype) / scaling_factor
@@ -427,29 +427,29 @@ def loss_step_gaussian_noise(
 
             vae_internal_dtype = vae.dtype if hasattr(vae, 'dtype') else torch.float32
             
-            # VAE解码
+            # VAE decoding
             with torch.cuda.amp.autocast(enabled=False):
                 pred_image_student = vae.decode(pred_x0_latent_student_for_vae.to(device=vae.device, dtype=vae_internal_dtype)).sample
                 gt_image = vae.decode(latent_x0_gt_viz_for_vae.to(device=vae.device, dtype=vae_internal_dtype)).sample
                 noisy_input_image = vae.decode(noisy_input_latent_for_vae.to(device=vae.device, dtype=vae_internal_dtype)).sample
 
-            # 后处理图像
+            # Post-process images
             pred_image_student = (pred_image_student / 2 + 0.5).clamp(0, 1)
             gt_image = (gt_image / 2 + 0.5).clamp(0, 1)
             noisy_input_image = (noisy_input_image / 2 + 0.5).clamp(0, 1)
 
-            # --- 创建按teacher分类的保存目录结构 ---
-            # 清理teacher名称，移除可能引起文件系统问题的字符
+            # --- Create save directory structure categorized by teacher ---
+            # Clean teacher name, remove characters that may cause filesystem issues
             clean_teacher_name = re.sub(r'[^\w\-_.]', '_', current_teacher_name)
             
             if base_save_dir:
-                # 使用传入的基础目录
+                # Use the provided base directory
                 teacher_save_dir = os.path.join(base_save_dir, f"teacher_{current_teacher_idx+1:02d}_{clean_teacher_name}")
             else:
-                # 使用默认目录
+                # Use the default directory
                 teacher_save_dir = os.path.join(output_dir_for_loss_step, f"teacher_{current_teacher_idx+1:02d}_{clean_teacher_name}")
             
-            # 创建子目录用于不同类型的图像
+            # Create subdirectories for different types of images
             subdirs = {
                 'student_pred': os.path.join(teacher_save_dir, 'student_predictions'),
                 'ground_truth': os.path.join(teacher_save_dir, 'ground_truth'),
@@ -461,49 +461,49 @@ def loss_step_gaussian_noise(
                 if not os.path.exists(subdir):
                     os.makedirs(subdir, exist_ok=True)
 
-            # --- 生成带时间戳和详细信息的文件名 ---
+            # --- Generate file names with timestamps and detailed info ---
             t_val = current_timestep_int
             timestamp_suffix = f"step_{global_step:06d}_t{t_val:03d}"
             
-            # 获取当前批次的文本信息（如果可用）
+            # Get text information for the current batch (if available)
             text_info = ""
             if "raw_text" in batch and batch["raw_text"]:
-                # 清理文本用于文件名
+                # Clean text for file name
                 raw_text = batch["raw_text"][0] if isinstance(batch["raw_text"], list) else str(batch["raw_text"])
-                clean_text = re.sub(r'[^\w\s\-_.]', '', raw_text)[:20]  # 限制长度
+                clean_text = re.sub(r'[^\w\s\-_.]', '', raw_text)[:20]  # Limit length
                 text_info = f"_{clean_text.replace(' ', '_')}" if clean_text else ""
             
-            # --- 保存各类图像 ---
-            # 1. 学生预测结果
+            # --- Save various types of images ---
+            # 1. Student prediction results
             student_pred_filename = f"{timestamp_suffix}_from_{clean_teacher_name}{text_info}.png"
             student_pred_path = os.path.join(subdirs['student_pred'], student_pred_filename)
             save_image(pred_image_student, student_pred_path)
             
-            # 2. 真实图像
+            # 2. Ground truth images
             gt_filename = f"{timestamp_suffix}_gt{text_info}.png"
             gt_path = os.path.join(subdirs['ground_truth'], gt_filename)
             save_image(gt_image, gt_path)
             
-            # 3. 噪声输入
+            # 3. Noisy input
             noisy_filename = f"{timestamp_suffix}_noisy{text_info}.png"
             noisy_path = os.path.join(subdirs['noisy_input'], noisy_filename)
             save_image(noisy_input_image, noisy_path)
             
-            # --- 4. 可选：创建对比网格图 ---
+            # --- 4. Optional: create comparison grid image ---
             if save_comparison_grid:
                 try:
                     import torchvision.utils as vutils
                     
-                    # 创建对比网格：[噪声输入, 学生预测, 真实图像]
+                    # Create comparison grid: [noisy input, student prediction, ground truth]
                     comparison_images = torch.cat([noisy_input_image, pred_image_student, gt_image], dim=0)
                     
-                    # 创建网格图
+                    # Create grid image
                     grid = vutils.make_grid(
                         comparison_images, 
                         nrow=3, 
                         padding=2, 
                         normalize=False,
-                        pad_value=1.0  # 白色边框
+                        pad_value=1.0  # White border
                     )
                     
                     comparison_filename = f"{timestamp_suffix}_comparison_from_{clean_teacher_name}{text_info}.png"
@@ -511,21 +511,21 @@ def loss_step_gaussian_noise(
                     save_image(grid.unsqueeze(0), comparison_path)
                     
                 except ImportError:
-                    print("警告: torchvision.utils 不可用，跳过对比网格图保存")
+                    print("Warning: torchvision.utils not available, skipping comparison grid image saving")
                 except Exception as e:
-                    print(f"警告: 保存对比网格图时出错: {e}")
+                    print(f"Warning: Error saving comparison grid image: {e}")
             
-            # --- 记录详细的保存信息 ---
-            print(f"[Step {global_step:06d}] 已保存 Teacher {current_teacher_idx+1} ({current_teacher_name}) 的预测结果:")
-            print(f"  📁 保存目录: {teacher_save_dir}")
-            print(f"  🎯 学生预测: {os.path.basename(student_pred_path)}")
-            print(f"  ✅ 真实图像: {os.path.basename(gt_path)}")
-            print(f"  🔀 噪声输入: {os.path.basename(noisy_path)}")
+            # --- Log detailed save information ---
+            print(f"[Step {global_step:06d}] Saved prediction results for Teacher {current_teacher_idx+1} ({current_teacher_name}):")
+            print(f"  📁 Save directory: {teacher_save_dir}")
+            print(f"  🎯 Student prediction: {os.path.basename(student_pred_path)}")
+            print(f"  ✅ Ground truth: {os.path.basename(gt_path)}")
+            print(f"  🔀 Noisy input: {os.path.basename(noisy_path)}")
             if save_comparison_grid:
-                print(f"  📊 对比网格: {os.path.basename(comparison_path)}")
-            print(f"  ⏰ 时间步: {t_val}, 损失: {loss.item():.6f}")
+                print(f"  📊 Comparison grid: {os.path.basename(comparison_path)}")
+            print(f"  ⏰ Timestep: {t_val}, Loss: {loss.item():.6f}")
             
-            # --- 可选：创建索引文件，便于后续分析 ---
+            # --- Optional: create index file for subsequent analysis ---
             index_file_path = os.path.join(teacher_save_dir, "save_index.txt")
             with open(index_file_path, "a", encoding='utf-8') as f:
                 f.write(f"{global_step:06d},{t_val:03d},{loss.item():.6f},{clean_teacher_name},{timestamp_suffix}\n")
@@ -540,17 +540,17 @@ def select_current_teacher(
     selection_index: int = 0
 ) -> int:
     """
-    选择当前要使用的teacher模型
+    Select the teacher model to use for the current step
     
     Args:
-        global_step: 当前全局步数
-        num_teachers: teacher数量
-        strategy: 选择策略
-        weights: teacher权重（用于weighted_random）
-        selection_index: 当前选择索引（用于round_robin）
+        global_step: Current global step count
+        num_teachers: Number of teachers
+        strategy: Selection strategy
+        weights: Teacher weights (for weighted_random)
+        selection_index: Current selection index (for round_robin)
     
     Returns:
-        选择的teacher索引
+        Selected teacher index
     """
     if strategy == "round_robin":
         return global_step % num_teachers
@@ -559,120 +559,120 @@ def select_current_teacher(
         if weights is None:
             weights = [1.0] * num_teachers
         weights = torch.tensor(weights, dtype=torch.float32)
-        weights = weights / weights.sum()  # 归一化
+        weights = weights / weights.sum()  # Normalize
         return torch.multinomial(weights, 1).item()
     
     elif strategy == "adaptive":
-        # 可以根据损失历史等信息自适应选择
-        # 这里先实现一个简单版本，后续可以扩展
+        # Can adaptively select based on loss history and other information
+        # Implementing a simple version here, can be extended later
         return global_step % num_teachers
     
     else:
         raise ValueError(f"Unknown teacher selection strategy: {strategy}")
 
 def train_inversion_with_multi_feature_alignment(
-    # --- "Teacher" 模型参数 (修改为列表形式) ---
-    teacher_unets: List,  # 从 teacher1_unet, teacher2_unet 改为列表
-    teacher_text_encoders: List,  # 从 teacher1_text_encoder, teacher2_text_encoder 改为列表
-    # --- "Student" 模型参数 ---
+    # --- "Teacher" model parameters (changed to list form) ---
+    teacher_unets: List,  # Changed from teacher1_unet, teacher2_unet to list
+    teacher_text_encoders: List,  # Changed from teacher1_text_encoder, teacher2_text_encoder to list
+    # --- "Student" model parameters ---
     student_unet,
     vae,
     student_text_encoder,
-    # --- Dataloader 参数 (修改为列表形式) ---
-    dataloaders: List,  # 从 dataloader1, dataloader2 改为列表
-    # --- 核心训练参数 ---
+    # --- Dataloader parameters (changed to list form) ---
+    dataloaders: List,  # Changed from dataloader1, dataloader2 to list
+    # --- Core training parameters ---
     num_steps: int,
     scheduler,
-    index_no_updates, # 指示哪些词元嵌入不应被更新
+    index_no_updates, # Indicates which token embeddings should not be updated
     optimizer,
     save_steps: int,
     placeholder_token_ids,
     placeholder_tokens,
     save_path: str,
-    # --- 学习率调度器 ---
-    lr_scheduler_main, # 对应文本嵌入优化器的学习率调度器
-    # --- LoRA 相关参数 (TI 中通常不直接使用，但 save_all 可能需要) ---
+    # --- Learning rate scheduler ---
+    lr_scheduler_main, # Learning rate scheduler for the text embedding optimizer
+    # --- LoRA related parameters (not usually used directly in TI, but save_all may need) ---
     lora_unet_target_modules, 
     lora_clip_target_modules, 
-    # --- 输出和日志相关 ---
+    # --- Output and logging related ---
     out_name: str,
     tokenizer,
     test_image_path: str,
     cached_latents: bool,
-    # --- 损失函数特定参数 ---
+    # --- Loss function specific parameters ---
     mask_temperature: float = 1.0,
-    t_multiplier_loss: float = 1.0, # 用于 loss_step_gaussian_noise
-    save_image_every_n_steps_loss: int = 200, # 用于 loss_step_gaussian_noise
-    # --- UNet Feature Alignment 参数 ---
-    unet_feature_align_weight: float = 0.01, # UNet特征对齐损失的权重
-    unet_feature_alignment_layers=[ # 用于UNet特征对齐的层
+    t_multiplier_loss: float = 1.0, # Used for loss_step_gaussian_noise
+    save_image_every_n_steps_loss: int = 200, # Used for loss_step_gaussian_noise
+    # --- UNet Feature Alignment parameters ---
+    unet_feature_align_weight: float = 0.01, # Weight for UNet feature alignment loss
+    unet_feature_alignment_layers=[ # Layers used for UNet feature alignment
         'down_blocks.0', 'down_blocks.1', 'down_blocks.2', 'down_blocks.3',
         'mid_block',
         'up_blocks.0', 'up_blocks.1', 'up_blocks.2', 'up_blocks.3'
     ],
-    # --- Text Encoder Feature Alignment 参数 ---
-    text_encoder_feature_align_weight: float = 0.1, # Text Encoder特征对齐损失的权重
-    text_encoder_alignment_layers=[ # 用于Text Encoder特征对齐的层 - 增加更多层
-        'text_model.encoder.layers.0',   # 第一层 - 捕获基础语言特征
-        'text_model.encoder.layers.2',   # 早期层 - 词汇理解
-        'text_model.encoder.layers.4',   # 中早期层 - 语法结构
-        'text_model.encoder.layers.6',   # 中期层 - 语义理解
-        'text_model.encoder.layers.8',   # 中后期层 - 复杂语义
-        'text_model.encoder.layers.10',  # 后期层 - 高级语义
-        'text_model.encoder.layers.11'   # 最后一层 - 最终表示
+    # --- Text Encoder Feature Alignment parameters ---
+    text_encoder_feature_align_weight: float = 0.1, # Weight for Text Encoder feature alignment loss
+    text_encoder_alignment_layers=[ # Layers used for Text Encoder feature alignment - added more layers
+        'text_model.encoder.layers.0',   # First layer - captures basic language features
+        'text_model.encoder.layers.2',   # Early layer - vocabulary understanding
+        'text_model.encoder.layers.4',   # Early-middle layer - syntactic structure
+        'text_model.encoder.layers.6',   # Middle layer - semantic understanding
+        'text_model.encoder.layers.8',   # Late-middle layer - complex semantics
+        'text_model.encoder.layers.10',  # Late layer - high-level semantics
+        'text_model.encoder.layers.11'   # Last layer - final representation
     ],
     text_encoder_pooling_strategy: str = "mean", # "mean", "cls", "max", "none"
-    text_encoder_loss_type: str = "mse", # 🔥 改为混合损失
-    # --- 🔥 新增: 混合损失参数 ---
-    text_encoder_primary_loss_type: str = "mse",  # 主损失类型
-    text_encoder_secondary_loss_type: str = "cosine",  # 次损失类型
-    text_encoder_loss_combination_weight: float = 0.3,  # 次损失权重
-    text_encoder_use_layer_adaptive: bool = True,  # 是否使用层级自适应
-    # --- UNet混合损失参数 ---
-    unet_feature_loss_type: str = "mse",  # 🔥 UNet也使用混合损失
+    text_encoder_loss_type: str = "mse", # 🔥 Changed to hybrid loss
+    # --- 🔥 New: hybrid loss parameters ---
+    text_encoder_primary_loss_type: str = "mse",  # Primary loss type
+    text_encoder_secondary_loss_type: str = "cosine",  # Secondary loss type
+    text_encoder_loss_combination_weight: float = 0.3,  # Secondary loss weight
+    text_encoder_use_layer_adaptive: bool = True,  # Whether to use layer-adaptive
+    # --- UNet hybrid loss parameters ---
+    unet_feature_loss_type: str = "mse",  # 🔥 UNet also uses hybrid loss
     unet_primary_loss_type: str = "mse",
     unet_secondary_loss_type: str = "cosine", 
     unet_loss_combination_weight: float = 0.3,
     unet_use_layer_adaptive: bool = True,
-    # --- 主要损失权重 ---
-    noise_pred_weight: float = 1.0, # 主要TI损失（噪声预测）的权重
-    # --- 其他参数 ---
-    unet_return_dict: bool = True, # UNetFeatureExtractor是否返回字典
-    accum_iter: int = 1, # 梯度累积步数
+    # --- Main loss weights ---
+    noise_pred_weight: float = 1.0, # Weight for the main TI loss (noise prediction)
+    # --- Other parameters ---
+    unet_return_dict: bool = True, # Whether UNetFeatureExtractor returns a dictionary
+    accum_iter: int = 1, # Gradient accumulation steps
     log_wandb: bool = False,
     wandb_log_prompt_cnt: int = 10,
     class_token: str = "person",
-    train_inpainting: bool = False, # TI中通常为False
+    train_inpainting: bool = False, # Usually False in TI
     mixed_precision: str = "no", # "no", "fp16", "bf16"
-    clip_ti_decay: bool = True, # 是否对TI嵌入应用衰减/正则化
+    clip_ti_decay: bool = True, # Whether to apply decay/regularization to TI embeddings
     tensorboard_log_dir: str = "runs_new",
-    teacher_selection_strategy: str = "round_robin",  # 新增：teacher选择策略
-    teacher_weights: Optional[List[float]] = None,  # 新增：teacher权重
+    teacher_selection_strategy: str = "round_robin",  # New: teacher selection strategy
+    teacher_weights: Optional[List[float]] = None,  # New: teacher weights
 ):
     """
-    train_inversion_with_multi_feature_alignment 函数：
-    支持多teacher的增强版文本逆向训练，同时使用UNet和Text Encoder的混合特征对齐。
+    train_inversion_with_multi_feature_alignment function:
+    Enhanced text inversion training supporting multiple teachers, using hybrid feature alignment for both UNet and Text Encoder.
     
-    🔥 新增功能：
-    1. 支持任意数量的teacher模型
-    2. UNet层间混合特征对齐 (MSE + Cosine)
-    3. Text Encoder层间混合特征对齐 (MSE + Cosine)
-    4. 可以独立控制两种特征对齐的权重和损失类型
-    5. 支持多种teacher选择策略
-    6. 详细的TensorBoard日志记录，包括每个teacher的损失分析
-    7. 层级自适应损失策略
+    🔥 New features:
+    1. Support for arbitrary number of teacher models
+    2. UNet inter-layer hybrid feature alignment (MSE + Cosine)
+    3. Text Encoder inter-layer hybrid feature alignment (MSE + Cosine)
+    4. Independent control of weights and loss types for both feature alignments
+    5. Support for multiple teacher selection strategies
+    6. Detailed TensorBoard logging, including loss analysis for each teacher
+    7. Layer-adaptive loss strategy
     """
 
-    # 验证输入参数
+    # Validate input parameters
     assert len(teacher_unets) == len(teacher_text_encoders) == len(dataloaders), \
         "teacher_unets, teacher_text_encoders, and dataloaders must have the same length"
     
     num_teachers = len(teacher_unets)
-    print(f"训练使用 {num_teachers} 个教师模型")
+    print(f"Training with {num_teachers} teacher models")
 
     use_mixed_precision = (mixed_precision != "no")
 
-    # --- TensorBoard 设置 ---
+    # --- TensorBoard setup ---
     import datetime
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     tb_log_path = os.path.join(tensorboard_log_dir, f"{out_name}_inversion_multi_teacher_hybrid_feat_align_{timestamp}")
@@ -680,9 +680,9 @@ def train_inversion_with_multi_feature_alignment(
     if not os.path.exists(tb_log_path):
         os.makedirs(tb_log_path, exist_ok=True)
     writer = SummaryWriter(log_dir=tb_log_path)
-    print(f"🔥 TensorBoard 日志 (多teacher混合特征对齐的文本逆向) 将保存到: {tb_log_path}")
+    print(f"🔥 TensorBoard logs (multi-teacher hybrid feature alignment text inversion) will be saved to: {tb_log_path}")
 
-    # --- 🔥 UNet混合特征对齐组件设置 ---
+    # --- 🔥 UNet hybrid feature alignment component setup ---
     unet_alignment_layers_for_loss = unet_feature_alignment_layers
     unet_layer_weights_for_fa_loss = {
         'mid_block': 2.0, 'down_blocks.2': 1.5, 'down_blocks.3': 1.5,
@@ -693,7 +693,7 @@ def train_inversion_with_multi_feature_alignment(
         if k in unet_alignment_layers_for_loss
     }
 
-    # 🔥 创建混合UNet特征对齐损失函数
+    # 🔥 Create hybrid UNet feature alignment loss function
     from feature_hook_unet import create_hybrid_unet_alignment_loss
     
     unet_feature_alignment_loss_fn = create_hybrid_unet_alignment_loss(
@@ -709,13 +709,13 @@ def train_inversion_with_multi_feature_alignment(
         channel_alignment="projection"
     )
     
-    print(f"🔥 UNet混合特征对齐损失配置:")
-    print(f"   - 损失类型: {unet_feature_loss_type}")
+    print(f"🔥 UNet hybrid feature alignment loss configuration:")
+    print(f"   - Loss type: {unet_feature_loss_type}")
     if unet_feature_loss_type == "hybrid":
-        print(f"   - 主损失: {unet_primary_loss_type} ({100*(1-unet_loss_combination_weight):.1f}%)")
-        print(f"   - 次损失: {unet_secondary_loss_type} ({100*unet_loss_combination_weight:.1f}%)")
+        print(f"   - Primary loss: {unet_primary_loss_type} ({100*(1-unet_loss_combination_weight):.1f}%)")
+        print(f"   - Secondary loss: {unet_secondary_loss_type} ({100*unet_loss_combination_weight:.1f}%)")
 
-    # 为每个teacher创建UNet特征提取器
+    # Create UNet feature extractor for each teacher
     teacher_unet_extractors = []
     for i, teacher_unet in enumerate(teacher_unets):
         extractor = UNetFeatureExtractor(
@@ -724,23 +724,23 @@ def train_inversion_with_multi_feature_alignment(
         )
         teacher_unet_extractors.append(extractor)
     
-    # 创建学生UNet特征提取器
+    # Create student UNet feature extractor
     student_unet_extractor = UNetFeatureExtractor(
         target_layers=unet_alignment_layers_for_loss,
         mixed_precision_config=mixed_precision
     )
     
-    # 初始化dataloader迭代器
+    # Initialize dataloader iterators
     dataloader_iters = [iter(dl) for dl in dataloaders]
-    teacher_selection_index = 0  # 用于round_robin策略
+    teacher_selection_index = 0  # Used for round_robin strategy
 
-    # 🔥 Text Encoder混合特征提取器
+    # 🔥 Text Encoder hybrid feature extractor
     text_encoder_feature_extractor = TextEncoderFeatureExtractor(
         target_layers=text_encoder_alignment_layers,
         mixed_precision_config=mixed_precision
     )
 
-    # 🔥 Text Encoder混合特征对齐损失函数
+    # 🔥 Text Encoder hybrid feature alignment loss function
     from feature_hook_text_encoder import create_hybrid_text_encoder_alignment_loss
     
     text_encoder_feature_alignment_loss_fn = create_hybrid_text_encoder_alignment_loss(
@@ -753,18 +753,18 @@ def train_inversion_with_multi_feature_alignment(
         use_layer_adaptive=text_encoder_use_layer_adaptive
     )
     
-    print(f"🔥 Text Encoder混合特征对齐损失配置:")
-    print(f"   - 损失类型: {text_encoder_loss_type}")
-    print(f"   - 池化策略: {text_encoder_pooling_strategy}")
+    print(f"🔥 Text Encoder hybrid feature alignment loss configuration:")
+    print(f"   - Loss type: {text_encoder_loss_type}")
+    print(f"   - Pooling strategy: {text_encoder_pooling_strategy}")
     if text_encoder_loss_type == "hybrid":
-        print(f"   - 主损失: {text_encoder_primary_loss_type} ({100*(1-text_encoder_loss_combination_weight):.1f}%)")
-        print(f"   - 次损失: {text_encoder_secondary_loss_type} ({100*text_encoder_loss_combination_weight:.1f}%)")
+        print(f"   - Primary loss: {text_encoder_primary_loss_type} ({100*(1-text_encoder_loss_combination_weight):.1f}%)")
+        print(f"   - Secondary loss: {text_encoder_secondary_loss_type} ({100*text_encoder_loss_combination_weight:.1f}%)")
 
     progress_bar = tqdm(range(num_steps))
-    progress_bar.set_description("训练步数 (多teacher混合特征对齐文本逆向)")
+    progress_bar.set_description("Training steps (multi-teacher hybrid feature alignment text inversion)")
     global_step = 0
 
-    # 备份原始的、非占位符的词元嵌入
+    # Backup original non-placeholder token embeddings
     orig_embeds_params = student_text_encoder.get_input_embeddings().weight.data.clone()
 
     if log_wandb:
@@ -782,15 +782,15 @@ def train_inversion_with_multi_feature_alignment(
 
     index_updates = ~index_no_updates
 
-    # 用于区间日志记录的累积损失
+    # Accumulated losses for interval logging
     accumulated_total_loss = 0.0
     accumulated_ti_loss = 0.0
     accumulated_unet_feature_loss = 0.0
     accumulated_text_encoder_feature_loss = 0.0
     step_count_in_interval = 0
 
-    # === 新增：为每个teacher模型的损失统计 ===
-    # 为每个teacher创建累积损失追踪器
+    # === New: loss statistics for each teacher model ===
+    # Create accumulated loss tracker for each teacher
     teacher_loss_trackers = []
     for i in range(num_teachers):
         teacher_loss_trackers.append({
@@ -799,24 +799,24 @@ def train_inversion_with_multi_feature_alignment(
             'text_encoder_feature_loss': 0.0,
             'total_loss': 0.0,
             'step_count': 0,
-            # 🔥 新增混合损失追踪
+            # 🔥 New hybrid loss tracking
             'unet_primary_loss': 0.0,
             'unet_secondary_loss': 0.0,
             'text_primary_loss': 0.0,
             'text_secondary_loss': 0.0,
         })
 
-    # 从模型确定设备
+    # Determine device from model
     unet_device = next(student_unet.parameters()).device
     text_encoder_device = next(student_text_encoder.parameters()).device
     vae_device = vae.device
 
-    # 主训练循环
+    # Main training loop
     for step_idx in range(num_steps):
         student_unet.eval()
         student_text_encoder.train()
 
-        # --- 选择当前教师模型和数据加载器 ---
+        # --- Select current teacher model and data loader ---
         current_teacher_idx = select_current_teacher(
             global_step=global_step,
             num_teachers=num_teachers,
@@ -825,7 +825,7 @@ def train_inversion_with_multi_feature_alignment(
             selection_index=teacher_selection_index
         )
         
-        # 获取当前选择的模型和数据
+        # Get currently selected model and data
         current_teacher_unet = teacher_unets[current_teacher_idx]
         current_teacher_text_encoder = teacher_text_encoders[current_teacher_idx]
         current_teacher_unet_extractor = teacher_unet_extractors[current_teacher_idx]
@@ -833,18 +833,18 @@ def train_inversion_with_multi_feature_alignment(
         current_dataloader_obj = dataloaders[current_teacher_idx]
         teacher_name_log = f"T{current_teacher_idx + 1}"
         
-        # 更新round_robin索引
+        # Update round_robin index
         if teacher_selection_strategy == "round_robin":
             teacher_selection_index = (teacher_selection_index + 1) % num_teachers
         
-        # 获取批次数据
+        # Get batch data
         try:
             batch = next(current_dataloader_iter)
         except StopIteration:
             dataloader_iters[current_teacher_idx] = iter(current_dataloader_obj)
             batch = next(dataloader_iters[current_teacher_idx])
 
-        # --- 潜变量准备 ---
+        # --- Latent variable preparation ---
         main_student_unet = student_unet.module if hasattr(student_unet, 'module') else student_unet
         expected_latents_dtype = main_student_unet.dtype if hasattr(main_student_unet, 'dtype') else torch.float32
 
@@ -857,18 +857,18 @@ def train_inversion_with_multi_feature_alignment(
                 latents = latents_dist.sample() * vae.config.scaling_factor
             latents = latents.to(device=unet_device, dtype=expected_latents_dtype)
 
-        # --- 准备输入数据 ---
+        # --- Prepare input data ---
         input_ids = batch["input_ids"].to(device=text_encoder_device)
         attention_mask = batch.get("attention_mask", None)
         if attention_mask is not None:
             attention_mask = attention_mask.to(device=text_encoder_device)
 
-        # --- 文本编码和特征提取 ---
+        # --- Text encoding and feature extraction ---
         main_teacher_unet = current_teacher_unet.module if hasattr(current_teacher_unet, 'module') else current_teacher_unet
         teacher_unet_internal_dtype = next(main_teacher_unet.parameters()).dtype
         student_unet_internal_dtype = next(main_student_unet.parameters()).dtype
 
-        # 教师Text Encoder编码和特征提取 (不需要梯度)
+        # Teacher Text Encoder encoding and feature extraction (no gradient needed)
         with torch.no_grad():
             with torch.cuda.amp.autocast(enabled=(use_mixed_precision and text_encoder_device.type == 'cuda')):
                 teacher_text_output, teacher_text_features = text_encoder_feature_extractor.extract_features(
@@ -880,18 +880,18 @@ def train_inversion_with_multi_feature_alignment(
                 )
                 teacher_encoder_hidden_states = teacher_text_output.to(dtype=teacher_unet_internal_dtype)
 
-        # 学生Text Encoder编码和特征提取 (需要梯度用于TI)
+        # Student Text Encoder encoding and feature extraction (gradient needed for TI)
         with torch.cuda.amp.autocast(enabled=(use_mixed_precision and text_encoder_device.type == 'cuda')):
             student_text_output, student_text_features = text_encoder_feature_extractor.extract_features(
                 text_encoder=student_text_encoder,
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 return_dict=True,
-                use_grad=True  # 允许梯度流向文本嵌入
+                use_grad=True  # Allow gradient flow to text embeddings
             )
             student_encoder_hidden_states = student_text_output.to(dtype=student_unet_internal_dtype)
 
-        # --- 噪声和时间步 ---
+        # --- Noise and timesteps ---
         noise = torch.randn_like(latents)
         bsz = latents.shape[0]
         timesteps = torch.randint(
@@ -909,9 +909,9 @@ def train_inversion_with_multi_feature_alignment(
         noisy_latents_for_student = noisy_latents.to(device=unet_device, dtype=student_unet_internal_dtype)
         timesteps_for_student = timesteps.to(device=unet_device)
 
-        # --- 前向传播和损失计算 ---
+        # --- Forward propagation and loss computation ---
         with torch.set_grad_enabled(True):
-            # 1. 教师UNet前向传播和特征提取 (不需要梯度)
+            # 1. Teacher UNet forward pass and feature extraction (no gradient needed)
             with torch.no_grad():
                 with torch.cuda.amp.autocast(enabled=(use_mixed_precision and noisy_latents_for_teacher.device.type == 'cuda')):
                     _, teacher_unet_features = current_teacher_unet_extractor.extract_features(
@@ -923,7 +923,7 @@ def train_inversion_with_multi_feature_alignment(
                         use_grad=False
                     )
 
-            # 2. 学生UNet前向传播和特征提取 (梯度需要流向文本嵌入)
+            # 2. Student UNet forward pass and feature extraction (gradient needs to flow to text embeddings)
             with torch.cuda.amp.autocast(enabled=(use_mixed_precision and noisy_latents_for_student.device.type == 'cuda')):
                 _, student_unet_features = student_unet_extractor.extract_features(
                     unet_model=student_unet, 
@@ -934,7 +934,7 @@ def train_inversion_with_multi_feature_alignment(
                     use_grad=True
                 )
             
-            # 3. 主要TI损失 (噪声预测损失)
+            # 3. Main TI loss (noise prediction loss)
             ti_loss_current_step = loss_step_gaussian_noise(
                 batch=batch,
                 student_unet=student_unet,
@@ -947,12 +947,12 @@ def train_inversion_with_multi_feature_alignment(
                 mask_temperature=mask_temperature,
             )
 
-            # 🔥 4. UNet混合特征对齐损失
+            # 🔥 4. UNet hybrid feature alignment loss
             valid_teacher_unet_features = isinstance(teacher_unet_features, dict) and teacher_unet_features
             valid_student_unet_features = isinstance(student_unet_features, dict) and student_unet_features
 
             if valid_teacher_unet_features and valid_student_unet_features:
-                # 使用新的混合损失函数，返回3个值
+                # Use new hybrid loss function, returns 3 values
                 unet_feature_align_loss_val, unet_feature_loss_dict_current, unet_detailed_loss_info = unet_feature_alignment_loss_fn(
                     teacher_unet_features, student_unet_features
                 )
@@ -961,12 +961,12 @@ def train_inversion_with_multi_feature_alignment(
                 unet_feature_loss_dict_current = {}
                 unet_detailed_loss_info = {}
 
-            # 🔥 5. Text Encoder混合特征对齐损失
+            # 🔥 5. Text Encoder hybrid feature alignment loss
             valid_teacher_text_features = isinstance(teacher_text_features, dict) and teacher_text_features
             valid_student_text_features = isinstance(student_text_features, dict) and student_text_features
 
             if valid_teacher_text_features and valid_student_text_features:
-                # 使用新的混合损失函数，返回3个值
+                # Use new hybrid loss function, returns 3 values
                 text_encoder_feature_align_loss_val, text_encoder_feature_loss_dict_current, text_detailed_loss_info = text_encoder_feature_alignment_loss_fn(
                     teacher_features=teacher_text_features,
                     student_features=student_text_features,
@@ -978,7 +978,7 @@ def train_inversion_with_multi_feature_alignment(
                 text_encoder_feature_loss_dict_current = {}
                 text_detailed_loss_info = {}
 
-            # 6. 动态权重调整
+            # 6. Dynamic weight adjustment
             inversion_weight_adjuster = create_inversion_weight_adjuster(
                 noise_pred_weight=noise_pred_weight,
                 unet_feature_weight=unet_feature_align_weight,
@@ -996,29 +996,29 @@ def train_inversion_with_multi_feature_alignment(
             unet_feature_align_weight = updated_weights['unet_feature_align']
             text_encoder_feature_align_weight = updated_weights['text_encoder_feature_align']
 
-            # 7. 总损失
+            # 7. Total loss
             current_step_total_loss = (
                 noise_pred_weight * ti_loss_current_step +
-                # unet_feature_align_weight * unet_feature_align_loss_val +  # 🔥 暂时注释UNet特征对齐
+                # unet_feature_align_weight * unet_feature_align_loss_val +  # 🔥 Temporarily commented out UNet feature alignment
                 text_encoder_feature_align_weight * text_encoder_feature_align_loss_val
             )
             
             loss_for_backward = current_step_total_loss / accum_iter
             loss_for_backward.backward()
 
-            # === 新增：记录当前teacher的混合损失到追踪器 ===
+            # === New: record current teacher's hybrid loss to tracker ===
             current_ti_loss_item = ti_loss_current_step.detach().item()
             current_unet_feature_loss_item = unet_feature_align_loss_val.detach().item() if torch.is_tensor(unet_feature_align_loss_val) else float(unet_feature_align_loss_val)
             current_text_encoder_feature_loss_item = text_encoder_feature_align_loss_val.detach().item() if torch.is_tensor(text_encoder_feature_align_loss_val) else float(text_encoder_feature_align_loss_val)
             current_total_loss_item = current_step_total_loss.detach().item()
 
-            # 🔥 提取混合损失的详细信息
+            # 🔥 Extract hybrid loss detailed information
             unet_primary_loss = 0.0
             unet_secondary_loss = 0.0
             text_primary_loss = 0.0
             text_secondary_loss = 0.0
             
-            # 从详细损失信息中提取主次损失
+            # Extract primary and secondary losses from detailed loss info
             for layer_name, loss_value in unet_detailed_loss_info.items():
                 if 'primary' in layer_name:
                     unet_primary_loss += loss_value
@@ -1031,40 +1031,40 @@ def train_inversion_with_multi_feature_alignment(
                 elif 'secondary' in layer_name:
                     text_secondary_loss += loss_value
 
-            # 更新当前teacher的混合损失追踪器
+            # Update current teacher's hybrid loss tracker
             teacher_loss_trackers[current_teacher_idx]['ti_loss'] += current_ti_loss_item
             teacher_loss_trackers[current_teacher_idx]['unet_feature_loss'] += current_unet_feature_loss_item
             teacher_loss_trackers[current_teacher_idx]['text_encoder_feature_loss'] += current_text_encoder_feature_loss_item
             teacher_loss_trackers[current_teacher_idx]['total_loss'] += current_total_loss_item
             teacher_loss_trackers[current_teacher_idx]['step_count'] += 1
-            # 🔥 新增混合损失追踪
+            # 🔥 New hybrid loss tracking
             teacher_loss_trackers[current_teacher_idx]['unet_primary_loss'] += unet_primary_loss
             teacher_loss_trackers[current_teacher_idx]['unet_secondary_loss'] += unet_secondary_loss
             teacher_loss_trackers[current_teacher_idx]['text_primary_loss'] += text_primary_loss
             teacher_loss_trackers[current_teacher_idx]['text_secondary_loss'] += text_secondary_loss
 
-            # 记录全局累积损失
+            # Record global accumulated losses
             accumulated_total_loss += current_total_loss_item
             accumulated_ti_loss += current_ti_loss_item
             accumulated_unet_feature_loss += current_unet_feature_loss_item
             accumulated_text_encoder_feature_loss += current_text_encoder_feature_loss_item
             step_count_in_interval += 1
 
-        # --- 优化器步骤和嵌入正则化 ---
+        # --- Optimizer step and embedding regularization ---
         if (global_step + 1) % accum_iter == 0:
             if student_text_encoder.get_input_embeddings().weight.grad is not None:
                 grad_slice = student_text_encoder.get_input_embeddings().weight.grad[index_updates, :]
                 if grad_slice.numel() > 0:
                     grad_norm = grad_slice.norm(dim=-1).mean()
                     if writer:
-                        writer.add_scalar('梯度/文本嵌入范数_多teacher混合FA', grad_norm.item(), global_step)
+                        writer.add_scalar('gradient/text_embedding_norm_multi_teacher_hybrid_FA', grad_norm.item(), global_step)
             else:
-                print(f"步骤 {global_step}: 警告：在多teacher混合FA更新期间未找到文本嵌入的梯度。")
+                print(f"Step {global_step}: Warning: No gradient found for text embeddings during multi-teacher hybrid FA update.")
 
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
 
-            # 文本嵌入正则化
+            # Text embedding regularization
             with torch.no_grad():
                 embed_weights = student_text_encoder.get_input_embeddings().weight
                 if clip_ti_decay:
@@ -1079,9 +1079,9 @@ def train_inversion_with_multi_feature_alignment(
 
                 current_norm_val = embed_weights[index_updates, :].norm(dim=-1).mean().item()
                 if writer:
-                    writer.add_scalar('嵌入/当前范数_多teacher混合FA', current_norm_val, global_step)
+                    writer.add_scalar('embedding/current_norm_multi_teacher_hybrid_FA', current_norm_val, global_step)
 
-                # 恢复未被更新的原始嵌入
+                # Restore original embeddings that were not updated
                 embed_weights.data[index_no_updates] = orig_embeds_params[index_no_updates]
         
         lr_scheduler_main.step()
@@ -1089,180 +1089,180 @@ def train_inversion_with_multi_feature_alignment(
         progress_bar.update(1)
         current_lr_val = lr_scheduler_main.get_last_lr()[0]
         
-        # 🔥 显示混合损失信息
+        # 🔥 Display hybrid loss information
         log_dict_postfix = {
-            "总损失": f"{current_step_total_loss.item():.4f}",
-            "TI损失": f"{ti_loss_current_step.item():.4f}",
-            "UNet特征": f"{unet_feature_align_loss_val.item() if torch.is_tensor(unet_feature_align_loss_val) else float(unet_feature_align_loss_val):.4f}",
-            "Text特征": f"{text_encoder_feature_align_loss_val.item() if torch.is_tensor(text_encoder_feature_align_loss_val) else float(text_encoder_feature_align_loss_val):.4f}",
+            "Total loss": f"{current_step_total_loss.item():.4f}",
+            "TI loss": f"{ti_loss_current_step.item():.4f}",
+            "UNet features": f"{unet_feature_align_loss_val.item() if torch.is_tensor(unet_feature_align_loss_val) else float(unet_feature_align_loss_val):.4f}",
+            "Text features": f"{text_encoder_feature_align_loss_val.item() if torch.is_tensor(text_encoder_feature_align_loss_val) else float(text_encoder_feature_align_loss_val):.4f}",
             "LR": f"{current_lr_val:.2e}",
-            "教师": teacher_name_log
+            "Teacher": teacher_name_log
         }
         progress_bar.set_postfix(**log_dict_postfix)
 
-        # === 新增：详细的TensorBoard记录 ===
+        # === New: detailed TensorBoard logging ===
         if writer:
-            # 全局损失记录
-            writer.add_scalar('损失_多teacher混合FA/总损失_单步', current_step_total_loss.item(), global_step)
-            writer.add_scalar('损失_多teacher混合FA/TI损失_单步', ti_loss_current_step.item(), global_step)
-            writer.add_scalar('损失_多teacher混合FA/UNet特征对齐损失_单步', unet_feature_align_loss_val.item() if torch.is_tensor(unet_feature_align_loss_val) else float(unet_feature_align_loss_val), global_step)
-            writer.add_scalar('损失_多teacher混合FA/TextEncoder特征对齐损失_单步', text_encoder_feature_align_loss_val.item() if torch.is_tensor(text_encoder_feature_align_loss_val) else float(text_encoder_feature_align_loss_val), global_step)
-            writer.add_scalar('学习率_多teacher混合FA/文本嵌入', current_lr_val, global_step)
-            writer.add_scalar('教师模型_多teacher混合FA/当前选择', current_teacher_idx + 1, global_step)
-            writer.add_scalar('权重_多teacher混合/TI损失权重', noise_pred_weight, global_step)
-            writer.add_scalar('权重_多teacher混合/UNet特征权重', unet_feature_align_weight, global_step)
-            writer.add_scalar('权重_多teacher混合/TextEncoder特征权重', text_encoder_feature_align_weight, global_step)
+            # Global loss logging
+            writer.add_scalar('loss_multi_teacher_hybrid_FA/total_loss_per_step', current_step_total_loss.item(), global_step)
+            writer.add_scalar('loss_multi_teacher_hybrid_FA/TI_loss_per_step', ti_loss_current_step.item(), global_step)
+            writer.add_scalar('loss_multi_teacher_hybrid_FA/UNet_feature_alignment_loss_per_step', unet_feature_align_loss_val.item() if torch.is_tensor(unet_feature_align_loss_val) else float(unet_feature_align_loss_val), global_step)
+            writer.add_scalar('loss_multi_teacher_hybrid_FA/TextEncoder_feature_alignment_loss_per_step', text_encoder_feature_align_loss_val.item() if torch.is_tensor(text_encoder_feature_align_loss_val) else float(text_encoder_feature_align_loss_val), global_step)
+            writer.add_scalar('learning_rate_multi_teacher_hybrid_FA/text_embedding', current_lr_val, global_step)
+            writer.add_scalar('teacher_model_multi_teacher_hybrid_FA/current_selection', current_teacher_idx + 1, global_step)
+            writer.add_scalar('weight_multi_teacher_hybrid/TI_loss_weight', noise_pred_weight, global_step)
+            writer.add_scalar('weight_multi_teacher_hybrid/UNet_feature_weight', unet_feature_align_weight, global_step)
+            writer.add_scalar('weight_multi_teacher_hybrid/TextEncoder_feature_weight', text_encoder_feature_align_weight, global_step)
             
-            # 🔥 新增：混合损失分解记录
-            writer.add_scalar('混合损失_UNet/主损失(MSE)', unet_primary_loss, global_step)
-            writer.add_scalar('混合损失_UNet/次损失(Cosine)', unet_secondary_loss, global_step)
-            writer.add_scalar('混合损失_Text/主损失(MSE)', text_primary_loss, global_step)
-            writer.add_scalar('混合损失_Text/次损失(Cosine)', text_secondary_loss, global_step)
+            # 🔥 New: hybrid loss decomposition logging
+            writer.add_scalar('hybrid_loss_UNet/primary_loss(MSE)', unet_primary_loss, global_step)
+            writer.add_scalar('hybrid_loss_UNet/secondary_loss(Cosine)', unet_secondary_loss, global_step)
+            writer.add_scalar('hybrid_loss_Text/primary_loss(MSE)', text_primary_loss, global_step)
+            writer.add_scalar('hybrid_loss_Text/secondary_loss(Cosine)', text_secondary_loss, global_step)
             
-            # === 新增：按teacher分类的混合损失记录 ===
+            # === New: hybrid loss logging categorized by teacher ===
             teacher_name_for_tb = f"Teacher_{current_teacher_idx+1:02d}"
             
-            # 当前teacher的单步损失
-            writer.add_scalar(f'Teacher损失/{teacher_name_for_tb}/TI损失_单步', current_ti_loss_item, global_step)
-            writer.add_scalar(f'Teacher损失/{teacher_name_for_tb}/UNet特征损失_单步', current_unet_feature_loss_item, global_step)
-            writer.add_scalar(f'Teacher损失/{teacher_name_for_tb}/TextEncoder特征损失_单步', current_text_encoder_feature_loss_item, global_step)
-            writer.add_scalar(f'Teacher损失/{teacher_name_for_tb}/总损失_单步', current_total_loss_item, global_step)
+            # Current teacher's per-step loss
+            writer.add_scalar(f'teacher_loss/{teacher_name_for_tb}/TI_loss_per_step', current_ti_loss_item, global_step)
+            writer.add_scalar(f'teacher_loss/{teacher_name_for_tb}/UNet_feature_loss_per_step', current_unet_feature_loss_item, global_step)
+            writer.add_scalar(f'teacher_loss/{teacher_name_for_tb}/TextEncoder_feature_loss_per_step', current_text_encoder_feature_loss_item, global_step)
+            writer.add_scalar(f'teacher_loss/{teacher_name_for_tb}/total_loss_per_step', current_total_loss_item, global_step)
             
-            # 🔥 当前teacher的混合损失分解
-            writer.add_scalar(f'Teacher混合损失/{teacher_name_for_tb}/UNet主损失_单步', unet_primary_loss, global_step)
-            writer.add_scalar(f'Teacher混合损失/{teacher_name_for_tb}/UNet次损失_单步', unet_secondary_loss, global_step)
-            writer.add_scalar(f'Teacher混合损失/{teacher_name_for_tb}/Text主损失_单步', text_primary_loss, global_step)
-            writer.add_scalar(f'Teacher混合损失/{teacher_name_for_tb}/Text次损失_单步', text_secondary_loss, global_step)
+            # 🔥 Current teacher's hybrid loss decomposition
+            writer.add_scalar(f'teacher_hybrid_loss/{teacher_name_for_tb}/UNet_primary_loss_per_step', unet_primary_loss, global_step)
+            writer.add_scalar(f'teacher_hybrid_loss/{teacher_name_for_tb}/UNet_secondary_loss_per_step', unet_secondary_loss, global_step)
+            writer.add_scalar(f'teacher_hybrid_loss/{teacher_name_for_tb}/Text_primary_loss_per_step', text_primary_loss, global_step)
+            writer.add_scalar(f'teacher_hybrid_loss/{teacher_name_for_tb}/Text_secondary_loss_per_step', text_secondary_loss, global_step)
             
-            # Teacher选择频率统计
+            # Teacher selection frequency statistics
             teacher_selection_counts = [tracker['step_count'] for tracker in teacher_loss_trackers]
             for i, count in enumerate(teacher_selection_counts):
-                writer.add_scalar(f'Teacher统计/Teacher_{i+1:02d}_选择次数', count, global_step)
+                writer.add_scalar(f'teacher_stats/Teacher_{i+1:02d}_selection_count', count, global_step)
             
-            # 🔥 记录各层的混合特征损失详细信息
+            # 🔥 Log per-layer hybrid feature loss detailed information
             if isinstance(unet_detailed_loss_info, dict):
                 for layer_name, layer_loss in unet_detailed_loss_info.items():
-                    # 🔥 严格的类型检查和转换
+                    # 🔥 Strict type checking and conversion
                     if isinstance(layer_loss, (int, float)):
-                        # 直接使用数值
+                        # Use numeric value directly
                         clean_layer_name = layer_name.replace(".", "_")
-                        writer.add_scalar(f'UNet混合特征损失_层/{clean_layer_name}', 
+                        writer.add_scalar(f'UNet_hybrid_feature_loss_layer/{clean_layer_name}', 
                                         layer_loss, global_step)
-                        # 按teacher分类记录
-                        writer.add_scalar(f'Teacher_UNet混合层损失/{teacher_name_for_tb}/{clean_layer_name}', 
+                        # Log categorized by teacher
+                        writer.add_scalar(f'teacher_UNet_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
                                         layer_loss, global_step)
                     elif isinstance(layer_loss, torch.Tensor):
-                        # Tensor类型，提取数值
-                        if layer_loss.numel() == 1:  # 标量tensor
+                        # Tensor type, extract numeric value
+                        if layer_loss.numel() == 1:  # Scalar tensor
                             clean_layer_name = layer_name.replace(".", "_")
                             loss_value = layer_loss.item()
-                            writer.add_scalar(f'UNet混合特征损失_层/{clean_layer_name}', 
+                            writer.add_scalar(f'UNet_hybrid_feature_loss_layer/{clean_layer_name}', 
                                             loss_value, global_step)
-                            writer.add_scalar(f'Teacher_UNet混合层损失/{teacher_name_for_tb}/{clean_layer_name}', 
+                            writer.add_scalar(f'teacher_UNet_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
                                             loss_value, global_step)
                         else:
-                            print(f"⚠️ 跳过非标量tensor损失记录: {layer_name} (shape: {layer_loss.shape})")
+                            print(f"⚠️ Skipping non-scalar tensor loss logging: {layer_name} (shape: {layer_loss.shape})")
                     elif isinstance(layer_loss, str) and layer_loss.replace('.', '', 1).replace('-', '', 1).isdigit():
-                        # 字符串数字，尝试转换
+                        # String number, try to convert
                         try:
                             loss_value = float(layer_loss)
                             clean_layer_name = layer_name.replace(".", "_")
-                            writer.add_scalar(f'UNet混合特征损失_层/{clean_layer_name}', 
+                            writer.add_scalar(f'UNet_hybrid_feature_loss_layer/{clean_layer_name}', 
                                             loss_value, global_step)
-                            writer.add_scalar(f'Teacher_UNet混合层损失/{teacher_name_for_tb}/{clean_layer_name}', 
+                            writer.add_scalar(f'teacher_UNet_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
                                             loss_value, global_step)
                         except (ValueError, TypeError):
-                            print(f"⚠️ 跳过无法转换的损失值: {layer_name}={layer_loss} (类型: {type(layer_loss)})")
+                            print(f"⚠️ Skipping unconvertible loss value: {layer_name}={layer_loss} (type: {type(layer_loss)})")
                     else:
-                        # 其他类型（如"hybrid"等配置字符串），跳过记录但不报错
+                        # Other types (e.g., "hybrid" config strings), skip logging without error
                         if not isinstance(layer_loss, str) or layer_loss not in ['hybrid', 'mse', 'cosine', 'scale_aware_cosine', 'layer_adaptive']:
-                            print(f"⚠️ 跳过非数值损失记录: {layer_name}={layer_loss} (类型: {type(layer_loss)})")
+                            print(f"⚠️ Skipping non-numeric loss logging: {layer_name}={layer_loss} (type: {type(layer_loss)})")
             
             if isinstance(text_detailed_loss_info, dict):
                 for layer_name, layer_loss in text_detailed_loss_info.items():
-                    # 🔥 同样的类型检查和转换逻辑
+                    # 🔥 Same type checking and conversion logic
                     if isinstance(layer_loss, (int, float)):
                         clean_layer_name = layer_name.replace(".", "_")
-                        writer.add_scalar(f'TextEncoder混合特征损失_层/{clean_layer_name}', 
+                        writer.add_scalar(f'TextEncoder_hybrid_feature_loss_layer/{clean_layer_name}', 
                                         layer_loss, global_step)
-                        writer.add_scalar(f'Teacher_TextEncoder混合层损失/{teacher_name_for_tb}/{clean_layer_name}', 
+                        writer.add_scalar(f'teacher_TextEncoder_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
                                         layer_loss, global_step)
                     elif isinstance(layer_loss, torch.Tensor):
-                        if layer_loss.numel() == 1:  # 标量tensor
+                        if layer_loss.numel() == 1:  # Scalar tensor
                             clean_layer_name = layer_name.replace(".", "_")
                             loss_value = layer_loss.item()
-                            writer.add_scalar(f'TextEncoder混合特征损失_层/{clean_layer_name}', 
+                            writer.add_scalar(f'TextEncoder_hybrid_feature_loss_layer/{clean_layer_name}', 
                                             loss_value, global_step)
-                            writer.add_scalar(f'Teacher_TextEncoder混合层损失/{teacher_name_for_tb}/{clean_layer_name}', 
+                            writer.add_scalar(f'teacher_TextEncoder_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
                                             loss_value, global_step)
                         else:
-                            print(f"⚠️ 跳过非标量tensor损失记录: {layer_name} (shape: {layer_loss.shape})")
+                            print(f"⚠️ Skipping non-scalar tensor loss logging: {layer_name} (shape: {layer_loss.shape})")
                     elif isinstance(layer_loss, str) and layer_loss.replace('.', '', 1).replace('-', '', 1).isdigit():
                         try:
                             loss_value = float(layer_loss)
                             clean_layer_name = layer_name.replace(".", "_")
-                            writer.add_scalar(f'TextEncoder混合特征损失_层/{clean_layer_name}', 
+                            writer.add_scalar(f'TextEncoder_hybrid_feature_loss_layer/{clean_layer_name}', 
                                             loss_value, global_step)
-                            writer.add_scalar(f'Teacher_TextEncoder混合层损失/{teacher_name_for_tb}/{clean_layer_name}', 
+                            writer.add_scalar(f'teacher_TextEncoder_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
                                             loss_value, global_step)
                         except (ValueError, TypeError):
-                            print(f"⚠️ 跳过无法转换的损失值: {layer_name}={layer_loss} (类型: {type(layer_loss)})")
+                            print(f"⚠️ Skipping unconvertible loss value: {layer_name}={layer_loss} (type: {type(layer_loss)})")
                     else:
-                        # 跳过配置类型的字符串，但不报错
+                        # Skip config-type strings without error
                         if not isinstance(layer_loss, str) or layer_loss not in ['hybrid', 'mse', 'cosine', 'scale_aware_cosine', 'layer_adaptive']:
-                            print(f"⚠️ 跳过非数值损失记录: {layer_name}={layer_loss} (类型: {type(layer_loss)})")
+                            print(f"⚠️ Skipping non-numeric loss logging: {layer_name}={layer_loss} (type: {type(layer_loss)})")
 
-    # === 最终统计报告包含混合损失信息 ===
+    # === Final statistics report including hybrid loss information ===
     print(f"\n" + "="*80)
-    print(f"多TEACHER混合特征对齐训练完成 - 最终统计报告")
+    print(f"Multi-TEACHER hybrid feature alignment training complete - Final statistics report")
     print(f"="*80)
-    print(f"总完成步数: {global_step}")
-    print(f"使用的teacher模型数量: {num_teachers}")
-    print(f"最终学习率: {current_lr_val:.2e}")
-    print(f"Teacher选择策略: {teacher_selection_strategy}")
-    print(f"🔥 混合损失配置:")
+    print(f"Total completed steps: {global_step}")
+    print(f"Number of teacher models used: {num_teachers}")
+    print(f"Final learning rate: {current_lr_val:.2e}")
+    print(f"Teacher selection strategy: {teacher_selection_strategy}")
+    print(f"🔥 Hybrid loss configuration:")
     print(f"   UNet: {unet_feature_loss_type} ({unet_primary_loss_type}+{unet_secondary_loss_type})")
     print(f"   Text: {text_encoder_loss_type} ({text_encoder_primary_loss_type}+{text_encoder_secondary_loss_type})")
     
-    # 记录最终的teacher混合损失统计到TensorBoard
+    # Record final teacher hybrid loss statistics to TensorBoard
     if writer:
         for i, tracker in enumerate(teacher_loss_trackers):
             teacher_name = f"Teacher_{i+1:02d}"
             step_count = tracker['step_count']
             
             if step_count > 0:
-                # 原有统计
+                # Original statistics
                 final_avg_ti_loss = tracker['ti_loss'] / step_count
                 final_avg_unet_loss = tracker['unet_feature_loss'] / step_count
                 final_avg_text_loss = tracker['text_encoder_feature_loss'] / step_count
                 final_avg_total_loss = tracker['total_loss'] / step_count
                 final_usage_freq = step_count / global_step
                 
-                # 🔥 新增混合损失统计
+                # 🔥 New hybrid loss statistics
                 final_avg_unet_primary = tracker['unet_primary_loss'] / step_count
                 final_avg_unet_secondary = tracker['unet_secondary_loss'] / step_count
                 final_avg_text_primary = tracker['text_primary_loss'] / step_count
                 final_avg_text_secondary = tracker['text_secondary_loss'] / step_count
                 
-                # 记录最终统计
-                writer.add_scalar(f'最终统计/{teacher_name}/最终平均TI损失', final_avg_ti_loss, global_step)
-                writer.add_scalar(f'最终统计/{teacher_name}/最终平均UNet损失', final_avg_unet_loss, global_step)
-                writer.add_scalar(f'最终统计/{teacher_name}/最终平均Text损失', final_avg_text_loss, global_step)
-                writer.add_scalar(f'最终统计/{teacher_name}/最终平均总损失', final_avg_total_loss, global_step)
-                writer.add_scalar(f'最终统计/{teacher_name}/最终使用频率', final_usage_freq, global_step)
+                # Record final statistics
+                writer.add_scalar(f'final_stats/{teacher_name}/final_avg_TI_loss', final_avg_ti_loss, global_step)
+                writer.add_scalar(f'final_stats/{teacher_name}/final_avg_UNet_loss', final_avg_unet_loss, global_step)
+                writer.add_scalar(f'final_stats/{teacher_name}/final_avg_Text_loss', final_avg_text_loss, global_step)
+                writer.add_scalar(f'final_stats/{teacher_name}/final_avg_total_loss', final_avg_total_loss, global_step)
+                writer.add_scalar(f'final_stats/{teacher_name}/final_usage_frequency', final_usage_freq, global_step)
                 
-                # 🔥 最终混合损失统计
-                writer.add_scalar(f'最终混合统计/{teacher_name}/UNet主损失均值', final_avg_unet_primary, global_step)
-                writer.add_scalar(f'最终混合统计/{teacher_name}/UNet次损失均值', final_avg_unet_secondary, global_step)
-                writer.add_scalar(f'最终混合统计/{teacher_name}/Text主损失均值', final_avg_text_primary, global_step)
-                writer.add_scalar(f'最终混合统计/{teacher_name}/Text次损失均值', final_avg_text_secondary, global_step)
+                # 🔥 Final hybrid loss statistics
+                writer.add_scalar(f'final_hybrid_stats/{teacher_name}/UNet_primary_loss_mean', final_avg_unet_primary, global_step)
+                writer.add_scalar(f'final_hybrid_stats/{teacher_name}/UNet_secondary_loss_mean', final_avg_unet_secondary, global_step)
+                writer.add_scalar(f'final_hybrid_stats/{teacher_name}/Text_primary_loss_mean', final_avg_text_primary, global_step)
+                writer.add_scalar(f'final_hybrid_stats/{teacher_name}/Text_secondary_loss_mean', final_avg_text_secondary, global_step)
                 
-                print(f"\n📈 {teacher_name} 最终混合损失统计:")
-                print(f"   总使用次数: {step_count}/{global_step} ({final_usage_freq:.2%})")
-                print(f"   最终平均TI损失: {final_avg_ti_loss:.6f}")
-                print(f"   🔥 UNet混合损失: 主={final_avg_unet_primary:.6f}, 次={final_avg_unet_secondary:.6f}")
-                print(f"   🔥 Text混合损失: 主={final_avg_text_primary:.6f}, 次={final_avg_text_secondary:.6f}")
-                print(f"   最终平均总损失: {final_avg_total_loss:.6f}")
+                print(f"\n📈 {teacher_name} final hybrid loss statistics:")
+                print(f"   Total usage count: {step_count}/{global_step} ({final_usage_freq:.2%})")
+                print(f"   Final average TI loss: {final_avg_ti_loss:.6f}")
+                print(f"   🔥 UNet hybrid loss: primary={final_avg_unet_primary:.6f}, secondary={final_avg_unet_secondary:.6f}")
+                print(f"   🔥 Text hybrid loss: primary={final_avg_text_primary:.6f}, secondary={final_avg_text_secondary:.6f}")
+                print(f"   Final average total loss: {final_avg_total_loss:.6f}")
     
     writer.close()
     
@@ -1279,9 +1279,9 @@ def train_inversion_with_multi_feature_alignment(
         save_lora=False,
     )
     
-    print(f"✅ 最终混合损失模型已保存至: {final_model_path}")
-    print(f"✅ TensorBoard日志已保存至: {tb_log_path}")
-    print(f"🔥 多teacher混合特征对齐训练完成!")
+    print(f"✅ Final hybrid loss model saved to: {final_model_path}")
+    print(f"✅ TensorBoard logs saved to: {tb_log_path}")
+    print(f"🔥 Multi-teacher hybrid feature alignment training complete!")
     print(f"="*80)
 
 def perform_tuning_multi_teacher(
@@ -1322,7 +1322,7 @@ def perform_tuning_multi_teacher(
     teacher_selection_strategy: str = "round_robin",
     teacher_weights: Optional[List[float]] = None,
     
-    # 🔥 新增：混合损失参数
+    # 🔥 New: hybrid loss parameters
     unet_feature_loss_type: str = "mse",  # "mse", "cosine", "hybrid", "scale_aware_cosine", "layer_adaptive"
     unet_primary_loss_type: str = "mse",
     unet_secondary_loss_type: str = "cosine",
@@ -1342,7 +1342,7 @@ def perform_tuning_multi_teacher(
     text_encoder_loss_combination_weight: float = 0.3,
     text_encoder_use_layer_adaptive: bool = True,
     
-    # 交替优化参数
+    # Alternating optimization parameters
     use_alternating_optimization: bool = False,
     alternating_interval: int = 5,
     alternating_schedule: str = "fixed",
@@ -1350,22 +1350,22 @@ def perform_tuning_multi_teacher(
     feature_only_steps: int = 0,
 ):
     """
-    🔥 执行支持混合损失的多teacher LoRA微调
+    🔥 Perform multi-teacher LoRA fine-tuning with hybrid loss support
     
-    新增功能：
-    1. UNet和Text Encoder的混合特征对齐损失
-    2. 支持多种损失类型：hybrid, scale_aware_cosine, layer_adaptive
-    3. 可配置的主次损失权重比例
-    4. 交替优化策略
-    5. 详细的损失分解监控
+    New features:
+    1. Hybrid feature alignment loss for UNet and Text Encoder
+    2. Support for multiple loss types: hybrid, scale_aware_cosine, layer_adaptive
+    3. Configurable primary/secondary loss weight ratio
+    4. Alternating optimization strategy
+    5. Detailed loss decomposition monitoring
     """
     
-    # 验证输入参数
+    # Validate input parameters
     assert len(teacher_unets) == len(teacher_text_encoders) == len(dataloaders), \
         "teacher_unets, teacher_text_encoders, and dataloaders must have the same length"
     
     num_teachers = len(teacher_unets)
-    print(f"🔥 混合损失LoRA调优使用 {num_teachers} 个教师模型")
+    print(f"🔥 Hybrid loss LoRA fine-tuning with {num_teachers} teacher models")
     
     import os
     import torch
@@ -1374,81 +1374,81 @@ def perform_tuning_multi_teacher(
     from torch.utils.tensorboard import SummaryWriter
     import datetime
     
-    # === 交替优化控制器 ===
+    # === Alternating optimization controller ===
     class AlternatingOptimizationController:
         def __init__(self):
-            self.current_mode = "noise"  # "noise" 或 "feature"
+            self.current_mode = "noise"  # "noise" or "feature"
             self.mode_switch_count = 0
             self.last_switch_step = 0
             self.noise_loss_history = []
             self.feature_loss_history = []
             
         def should_switch_mode(self, global_step):
-            """判断是否应该切换优化模式"""
+            """Determine whether to switch optimization mode"""
             if alternating_schedule == "fixed":
-                # 固定间隔切换
+                # Switch at fixed intervals
                 if global_step > 0 and (global_step - self.last_switch_step) >= alternating_interval:
                     return True
             elif alternating_schedule == "adaptive":
-                # 简单的自适应策略：基于损失趋势
+                # Simple adaptive strategy: based on loss trend
                 if len(self.noise_loss_history) >= 5 and len(self.feature_loss_history) >= 5:
-                    # 如果当前优化的损失在最近几步没有明显下降，则切换
+                    # If the currently optimized loss hasn't decreased significantly in recent steps, switch
                     if self.current_mode == "noise":
                         recent_trend = (self.noise_loss_history[-1] - self.noise_loss_history[-3]) / (self.noise_loss_history[-3] + 1e-8)
-                        if recent_trend > -0.01:  # 没有明显下降
+                        if recent_trend > -0.01:  # No significant decrease
                             return True
                     else:
                         recent_trend = (self.feature_loss_history[-1] - self.feature_loss_history[-3]) / (self.feature_loss_history[-3] + 1e-8)
-                        if recent_trend > -0.01:  # 没有明显下降
+                        if recent_trend > -0.01:  # No significant decrease
                             return True
             return False
             
         def switch_mode(self, global_step):
-            """切换优化模式"""
+            """Switch optimization mode"""
             old_mode = self.current_mode
             self.current_mode = "feature" if self.current_mode == "noise" else "noise"
             self.mode_switch_count += 1
             self.last_switch_step = global_step
             
-            print(f"🔄 [Step {global_step}] 切换优化模式: {old_mode} -> {self.current_mode} (第{self.mode_switch_count}次切换)")
+            print(f"🔄 [Step {global_step}] Switched optimization mode: {old_mode} -> {self.current_mode} (switch #{self.mode_switch_count})")
             
         def get_current_mode(self, global_step):
-            """获取当前步的优化模式"""
-            # 处理特殊阶段
+            """Get optimization mode for the current step"""
+            # Handle special phases
             if global_step < noise_only_steps:
                 return "noise"
             elif feature_only_steps > 0 and global_step >= (num_steps - feature_only_steps):
                 return "feature"
             
-            # 正常交替阶段
+            # Normal alternating phase
             return self.current_mode
             
         def update_loss_history(self, noise_loss, feature_loss):
-            """更新损失历史"""
+            """Update loss history"""
             self.noise_loss_history.append(noise_loss)
             self.feature_loss_history.append(feature_loss)
             
-            # 保持历史长度
+            # Maintain history length
             if len(self.noise_loss_history) > 20:
                 self.noise_loss_history.pop(0)
             if len(self.feature_loss_history) > 20:
                 self.feature_loss_history.pop(0)
 
-    # 创建交替优化控制器
+    # Create alternating optimization controller
     if use_alternating_optimization:
         alt_controller = AlternatingOptimizationController()
-        print(f"✅ 启用交替优化模式:")
-        print(f"   • 交替间隔: {alternating_interval} 步")
-        print(f"   • 调度策略: {alternating_schedule}")
+        print(f"✅ Alternating optimization mode enabled:")
+        print(f"   • Alternating interval: {alternating_interval} steps")
+        print(f"   • Scheduling strategy: {alternating_schedule}")
         if noise_only_steps > 0:
-            print(f"   • 仅Noise优化: 前 {noise_only_steps} 步")
+            print(f"   • Noise-only optimization: first {noise_only_steps} steps")
         if feature_only_steps > 0:
-            print(f"   • 仅Feature优化: 后 {feature_only_steps} 步")
+            print(f"   • Feature-only optimization: last {feature_only_steps} steps")
     else:
         alt_controller = None
-        print(f"📊 使用传统联合损失优化模式")
+        print(f"📊 Using traditional joint loss optimization mode")
 
-    # === TensorBoard设置 ===
+    # === TensorBoard setup ===
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     opt_mode = "alternating" if use_alternating_optimization else "joint"
     tb_log_path = os.path.join(tensorboard_log_dir, f"{out_name}_{opt_mode}_multi_teacher_hybrid_lora_{timestamp}")
@@ -1456,11 +1456,11 @@ def perform_tuning_multi_teacher(
     if not os.path.exists(tb_log_path):
         os.makedirs(tb_log_path, exist_ok=True)
     writer = SummaryWriter(log_dir=tb_log_path)
-    print(f"📊 TensorBoard 日志将保存到: {tb_log_path}")
+    print(f"📊 TensorBoard logs will be saved to: {tb_log_path}")
 
-    # === 🔥 混合特征对齐损失函数组件设置 ===
+    # === 🔥 Hybrid feature alignment loss function component setup ===
     
-    # UNet混合特征对齐
+    # UNet hybrid feature alignment
     alignment_layers_for_loss = feature_alignment_unet_layers
     layer_weights_for_loss = {
         'mid_block': 2.0, 'down_blocks.2': 1.5, 'down_blocks.3': 1.5,
@@ -1468,7 +1468,7 @@ def perform_tuning_multi_teacher(
     }
     layer_weights_for_loss = {k: v for k, v in layer_weights_for_loss.items() if k in alignment_layers_for_loss}
 
-    # 🔥 创建混合UNet特征对齐损失函数
+    # 🔥 Create hybrid UNet feature alignment loss function
     from feature_hook_unet import create_hybrid_unet_alignment_loss
     
     unet_feature_alignment_loss_fn = create_hybrid_unet_alignment_loss(
@@ -1484,25 +1484,25 @@ def perform_tuning_multi_teacher(
         channel_alignment="projection"
     )
     
-    print(f"🔥 UNet混合特征对齐损失配置:")
-    print(f"   - 损失类型: {unet_feature_loss_type}")
+    print(f"🔥 UNet hybrid feature alignment loss configuration:")
+    print(f"   - Loss type: {unet_feature_loss_type}")
     if unet_feature_loss_type == "hybrid":
-        print(f"   - 主损失: {unet_primary_loss_type} ({100*(1-unet_loss_combination_weight):.1f}%)")
-        print(f"   - 次损失: {unet_secondary_loss_type} ({100*unet_loss_combination_weight:.1f}%)")
+        print(f"   - Primary loss: {unet_primary_loss_type} ({100*(1-unet_loss_combination_weight):.1f}%)")
+        print(f"   - Secondary loss: {unet_secondary_loss_type} ({100*unet_loss_combination_weight:.1f}%)")
 
-    # 🔥 Text Encoder混合特征对齐
+    # 🔥 Text Encoder hybrid feature alignment
     from feature_hook_text_encoder import (
         TextEncoderFeatureExtractor, 
         create_hybrid_text_encoder_alignment_loss
     )
     
-    # Text Encoder特征提取器
+    # Text Encoder feature extractor
     text_encoder_feature_extractor = TextEncoderFeatureExtractor(
         target_layers=text_encoder_alignment_layers,
         mixed_precision_config=mixed_precision
     )
 
-    # 🔥 Text Encoder混合特征对齐损失函数
+    # 🔥 Text Encoder hybrid feature alignment loss function
     text_encoder_feature_alignment_loss_fn = create_hybrid_text_encoder_alignment_loss(
         alignment_layers=text_encoder_alignment_layers,
         loss_type=text_encoder_loss_type,
@@ -1513,14 +1513,14 @@ def perform_tuning_multi_teacher(
         use_layer_adaptive=text_encoder_use_layer_adaptive
     )
     
-    print(f"🔥 Text Encoder混合特征对齐损失配置:")
-    print(f"   - 损失类型: {text_encoder_loss_type}")
-    print(f"   - 池化策略: {text_encoder_pooling_strategy}")
+    print(f"🔥 Text Encoder hybrid feature alignment loss configuration:")
+    print(f"   - Loss type: {text_encoder_loss_type}")
+    print(f"   - Pooling strategy: {text_encoder_pooling_strategy}")
     if text_encoder_loss_type == "hybrid":
-        print(f"   - 主损失: {text_encoder_primary_loss_type} ({100*(1-text_encoder_loss_combination_weight):.1f}%)")
-        print(f"   - 次损失: {text_encoder_secondary_loss_type} ({100*text_encoder_loss_combination_weight:.1f}%)")
+        print(f"   - Primary loss: {text_encoder_primary_loss_type} ({100*(1-text_encoder_loss_combination_weight):.1f}%)")
+        print(f"   - Secondary loss: {text_encoder_secondary_loss_type} ({100*text_encoder_loss_combination_weight:.1f}%)")
 
-    # 为每个teacher创建UNet特征提取器
+    # Create UNet feature extractor for each teacher
     from feature_hook_unet import UNetFeatureExtractor
     
     teacher_extractors = []
@@ -1531,7 +1531,7 @@ def perform_tuning_multi_teacher(
         )
         teacher_extractors.append(extractor)
     
-    # 创建学生UNet特征提取器
+    # Create student UNet feature extractor
     student_extractor = UNetFeatureExtractor(
         target_layers=feature_alignment_unet_layers,
         mixed_precision_config=mixed_precision
@@ -1540,11 +1540,11 @@ def perform_tuning_multi_teacher(
     progress_bar = tqdm(range(num_steps), desc=f"Multi-Teacher Hybrid LoRA ({'Alternating' if use_alternating_optimization else 'Joint'}) Training")
     global_step = 0
 
-    # 初始化dataloader迭代器
+    # Initialize dataloader iterators
     dataloader_iters = [iter(dl) for dl in dataloaders]
-    teacher_selection_index = 0  # 用于round_robin策略
+    teacher_selection_index = 0  # Used for round_robin strategy
 
-    # === 为每个teacher模型的混合损失统计 ===
+    # === Hybrid loss statistics for each teacher model ===
     teacher_loss_trackers = []
     for i in range(num_teachers):
         teacher_loss_trackers.append({
@@ -1553,14 +1553,14 @@ def perform_tuning_multi_teacher(
             'text_encoder_feature_align_loss': 0.0,
             'total_loss': 0.0,
             'step_count': 0,
-            # 🔥 新增混合损失追踪
+            # 🔥 New hybrid loss tracking
             'unet_primary_loss': 0.0,
             'unet_secondary_loss': 0.0,
             'text_primary_loss': 0.0,
             'text_secondary_loss': 0.0,
         })
 
-    # 用于区间日志记录的累积损失
+    # Accumulated losses for interval logging
     accumulated_total_loss = 0.0
     accumulated_noise_loss = 0.0
     accumulated_unet_feature_loss = 0.0
@@ -1570,9 +1570,9 @@ def perform_tuning_multi_teacher(
     student_unet.train()
     student_text_encoder.train()
 
-    # ===== 主训练循环 =====
+    # ===== Main training loop =====
     for step_idx in range(num_steps):
-        # --- 选择当前教师模型 ---
+        # --- Select current teacher model ---
         current_teacher_idx = select_current_teacher(
             global_step=global_step,
             num_teachers=num_teachers,
@@ -1581,7 +1581,7 @@ def perform_tuning_multi_teacher(
             selection_index=teacher_selection_index
         )
         
-        # 获取当前选择的模型和数据
+        # Get currently selected model and data
         current_teacher_unet = teacher_unets[current_teacher_idx]
         current_teacher_text_encoder = teacher_text_encoders[current_teacher_idx]
         current_teacher_extractor = teacher_extractors[current_teacher_idx]
@@ -1589,20 +1589,20 @@ def perform_tuning_multi_teacher(
         current_dataloader_obj = dataloaders[current_teacher_idx]
         teacher_name_log = f"T{current_teacher_idx + 1}"
         
-        # 更新round_robin索引
+        # Update round_robin index
         if teacher_selection_strategy == "round_robin":
             teacher_selection_index = (teacher_selection_index + 1) % num_teachers
 
-        # 获取批次数据
+        # Get batch data
         try:
             batch = next(current_dataloader_iter)
         except StopIteration:
             dataloader_iters[current_teacher_idx] = iter(current_dataloader_obj)
             batch = next(dataloader_iters[current_teacher_idx])
 
-        # --- 🔥 前向传播计算所有损失（用于监控和决策） ---
+        # --- 🔥 Forward pass to compute all losses (for monitoring and decision making) ---
         
-        # 1. 计算noise prediction loss
+        # 1. Compute noise prediction loss
         noise_pred_loss = loss_step_gaussian_noise(
             batch=batch,
             student_unet=student_unet,
@@ -1618,9 +1618,9 @@ def perform_tuning_multi_teacher(
             save_comparison_grid=True,
         )
 
-        # 2. 计算feature alignment losses
+        # 2. Compute feature alignment losses
         
-        # Latent 处理
+        # Latent processing
         main_module = student_unet.module if hasattr(student_unet, 'module') else student_unet
         expected_latents_dtype = main_module.dtype if hasattr(main_module, 'dtype') else torch.float32
 
@@ -1633,7 +1633,7 @@ def perform_tuning_multi_teacher(
                 latents = vae.encode(input_pixels_for_vae).latent_dist.sample() * vae.config.scaling_factor
             latents = latents.to(device=main_module.device, dtype=expected_latents_dtype)
 
-        # 文本编码
+        # Text encoding
         text_encoder_device = student_text_encoder.device if hasattr(student_text_encoder, 'device') else main_module.device
         input_ids = batch["input_ids"].to(device=text_encoder_device)
         attention_mask = batch.get("attention_mask", None)
@@ -1645,7 +1645,7 @@ def perform_tuning_multi_teacher(
         if student_attention_mask is not None:
             student_attention_mask = student_attention_mask.to(device=text_encoder_device)
 
-        # 🔥 Teacher Text Encoder编码和特征提取 (不需要梯度)
+        # 🔥 Teacher Text Encoder encoding and feature extraction (no gradient needed)
         teacher_unet_internal_dtype = next(current_teacher_unet.parameters()).dtype
         with torch.no_grad():
             with torch.cuda.amp.autocast(enabled=(mixed_precision != "no" and text_encoder_device.type == 'cuda')):
@@ -1658,7 +1658,7 @@ def perform_tuning_multi_teacher(
                 )
                 teacher_encoder_hidden_states = teacher_text_output.to(dtype=teacher_unet_internal_dtype)
 
-        # 🔥 Student Text Encoder编码和特征提取 (需要梯度)
+        # 🔥 Student Text Encoder encoding and feature extraction (gradient needed)
         student_unet_internal_dtype = next(student_unet.parameters()).dtype
         with torch.cuda.amp.autocast(enabled=(mixed_precision != "no" and text_encoder_device.type == 'cuda')):
             student_text_output, student_text_features = text_encoder_feature_extractor.extract_features(
@@ -1670,7 +1670,7 @@ def perform_tuning_multi_teacher(
             )
             student_encoder_hidden_states = student_text_output.to(dtype=student_unet_internal_dtype)
 
-        # 噪声和时间步
+        # Noise and timesteps
         noise = torch.randn_like(latents)
         bsz = latents.shape[0]
         timesteps = torch.randint(
@@ -1679,7 +1679,7 @@ def perform_tuning_multi_teacher(
         ).long()
         noisy_latents = scheduler.add_noise(latents, noise, timesteps).to(dtype=expected_latents_dtype)
 
-        # 🔥 教师UNet前向传播（提取特征）
+        # 🔥 Teacher UNet forward pass (extract features)
         with torch.no_grad():
             teacher_noise_pred, teacher_unet_features = current_teacher_extractor.extract_features(
                 unet_model=current_teacher_unet,
@@ -1690,7 +1690,7 @@ def perform_tuning_multi_teacher(
                 use_grad=False
             )
 
-        # 🔥 学生UNet前向传播（提取特征）
+        # 🔥 Student UNet forward pass (extract features)
         _, student_unet_features = student_extractor.extract_features(
             unet_model=student_unet,
             sample=noisy_latents,
@@ -1700,12 +1700,12 @@ def perform_tuning_multi_teacher(
             use_grad=True
         )
 
-        # 🔥 计算UNet混合特征对齐损失
+        # 🔥 Compute UNet hybrid feature alignment loss
         valid_teacher_unet_features = isinstance(teacher_unet_features, dict) and teacher_unet_features
         valid_student_unet_features = isinstance(student_unet_features, dict) and student_unet_features
 
         if valid_teacher_unet_features and valid_student_unet_features:
-            # 使用新的混合损失函数，返回3个值
+            # Use new hybrid loss function, returns 3 values
             unet_feature_align_loss, unet_feature_loss_dict, unet_detailed_loss_info = unet_feature_alignment_loss_fn(
                 teacher_unet_features, student_unet_features
             )
@@ -1714,12 +1714,12 @@ def perform_tuning_multi_teacher(
             unet_feature_loss_dict = {}
             unet_detailed_loss_info = {}
 
-        # 🔥 计算Text Encoder混合特征对齐损失
+        # 🔥 Compute Text Encoder hybrid feature alignment loss
         valid_teacher_text_features = isinstance(teacher_text_features, dict) and teacher_text_features
         valid_student_text_features = isinstance(student_text_features, dict) and student_text_features
 
         if valid_teacher_text_features and valid_student_text_features:
-            # 使用新的混合损失函数，返回3个值
+            # Use new hybrid loss function, returns 3 values
             text_encoder_feature_align_loss, text_encoder_feature_loss_dict, text_detailed_loss_info = text_encoder_feature_alignment_loss_fn(
                 teacher_features=teacher_text_features,
                 student_features=student_text_features,
@@ -1731,18 +1731,18 @@ def perform_tuning_multi_teacher(
             text_encoder_feature_loss_dict = {}
             text_detailed_loss_info = {}
 
-        # 记录损失值用于监控
+        # Record loss values for monitoring
         current_noise_loss_item = noise_pred_loss.item()
         current_unet_feature_loss_item = unet_feature_align_loss.item() if isinstance(unet_feature_align_loss, torch.Tensor) else unet_feature_align_loss
         current_text_encoder_feature_loss_item = text_encoder_feature_align_loss.item() if isinstance(text_encoder_feature_align_loss, torch.Tensor) else text_encoder_feature_align_loss
 
-        # 🔥 提取混合损失的详细信息
+        # 🔥 Extract hybrid loss detailed information
         unet_primary_loss = 0.0
         unet_secondary_loss = 0.0
         text_primary_loss = 0.0
         text_secondary_loss = 0.0
         
-        # 从详细损失信息中提取主次损失
+        # Extract primary and secondary losses from detailed loss info
         for layer_name, loss_value in unet_detailed_loss_info.items():
             if 'primary' in layer_name and isinstance(loss_value, (int, float)):
                 unet_primary_loss += loss_value
@@ -1755,24 +1755,24 @@ def perform_tuning_multi_teacher(
             elif 'secondary' in layer_name and isinstance(loss_value, (int, float)):
                 text_secondary_loss += loss_value
 
-        # === 🔥 交替优化逻辑 ===
+        # === 🔥 Alternating optimization logic ===
         if use_alternating_optimization:
-            # 更新损失历史
+            # Update loss history
             total_feature_loss = current_unet_feature_loss_item + current_text_encoder_feature_loss_item
             alt_controller.update_loss_history(current_noise_loss_item, total_feature_loss)
             
-            # 检查是否需要切换模式
+            # Check if mode switch is needed
             if alt_controller.should_switch_mode(global_step):
                 alt_controller.switch_mode(global_step)
             
-            # 获取当前优化模式
+            # Get current optimization mode
             current_mode = alt_controller.get_current_mode(global_step)
             
-            # 根据当前模式选择要优化的损失
+            # Select loss to optimize based on current mode
             optimizer.zero_grad()
             
             if current_mode == "noise":
-                # 只优化noise prediction loss
+                # Only optimize noise prediction loss
                 actual_loss = noise_pred_loss
                 loss_for_display = {
                     'optimizing': 'noise',
@@ -1780,7 +1780,7 @@ def perform_tuning_multi_teacher(
                     'monitoring_loss': total_feature_loss
                 }
             else:  # feature mode
-                # 优化feature alignment losses
+                # Optimize feature alignment losses
                 actual_loss = (
                     feature_align_weight * unet_feature_align_loss +
                     text_encoder_feature_align_weight * text_encoder_feature_align_loss
@@ -1791,16 +1791,16 @@ def perform_tuning_multi_teacher(
                     'monitoring_loss': current_noise_loss_item
                 }
             
-            # 反向传播和优化
+            # Backpropagation and optimization
             actual_loss.backward()
             optimizer.step()
             lr_scheduler_lora.step()
             
-            # 记录实际优化的损失作为total_loss
+            # Record the actually optimized loss as total_loss
             current_total_loss_item = actual_loss.item()
             
         else:
-            # 传统的联合优化
+            # Traditional joint optimization
             from dynamic_weight import create_tuning_weight_adjuster
             
             tuning_weight_adjuster = create_tuning_weight_adjuster(
@@ -1820,14 +1820,14 @@ def perform_tuning_multi_teacher(
             feature_align_weight = updated_weights.get('unet_feature_align', feature_align_weight)
             text_encoder_feature_align_weight = updated_weights.get('text_encoder_feature_align', text_encoder_feature_align_weight)
 
-            # 总损失
+            # Total loss
             total_loss = (
                 noise_pred_weight * noise_pred_loss +
                 feature_align_weight * unet_feature_align_loss +
                 text_encoder_feature_align_weight * text_encoder_feature_align_loss
             )
 
-            # 反向传播和优化器步骤
+            # Backpropagation and optimizer steps
             optimizer.zero_grad()
             total_loss.backward()
             optimizer.step()
@@ -1841,20 +1841,20 @@ def perform_tuning_multi_teacher(
                 'monitoring_loss': 0.0
             }
 
-        # === 🔥 记录统计信息 ===
-        # 更新当前teacher的混合损失追踪器
+        # === 🔥 Record statistics ===
+        # Update current teacher's hybrid loss tracker
         teacher_loss_trackers[current_teacher_idx]['noise_pred_loss'] += current_noise_loss_item
         teacher_loss_trackers[current_teacher_idx]['unet_feature_align_loss'] += current_unet_feature_loss_item
         teacher_loss_trackers[current_teacher_idx]['text_encoder_feature_align_loss'] += current_text_encoder_feature_loss_item
         teacher_loss_trackers[current_teacher_idx]['total_loss'] += current_total_loss_item
         teacher_loss_trackers[current_teacher_idx]['step_count'] += 1
-        # 🔥 新增混合损失追踪
+        # 🔥 New hybrid loss tracking
         teacher_loss_trackers[current_teacher_idx]['unet_primary_loss'] += unet_primary_loss
         teacher_loss_trackers[current_teacher_idx]['unet_secondary_loss'] += unet_secondary_loss
         teacher_loss_trackers[current_teacher_idx]['text_primary_loss'] += text_primary_loss
         teacher_loss_trackers[current_teacher_idx]['text_secondary_loss'] += text_secondary_loss
 
-        # 记录全局累积损失
+        # Record global accumulated losses
         accumulated_total_loss += current_total_loss_item
         accumulated_noise_loss += current_noise_loss_item
         accumulated_unet_feature_loss += current_unet_feature_loss_item
@@ -1863,7 +1863,7 @@ def perform_tuning_multi_teacher(
 
         current_lr = lr_scheduler_lora.get_last_lr()[0]
         
-        # 🔥 显示混合损失进度信息
+        # 🔥 Display hybrid loss progress information
         mode_display = current_mode.upper()
         progress_bar.set_postfix({
             'mode': mode_display,
@@ -1876,123 +1876,123 @@ def perform_tuning_multi_teacher(
         })
         progress_bar.update(1)
 
-        # === 🔥 详细的TensorBoard记录 ===
+        # === 🔥 Detailed TensorBoard logging ===
         if writer:
-            # 基础损失记录
-            writer.add_scalar('损失/噪声预测损失_单步', current_noise_loss_item, global_step)
-            writer.add_scalar('损失/UNet特征对齐损失_单步', current_unet_feature_loss_item, global_step)
-            writer.add_scalar('损失/TextEncoder特征对齐损失_单步', current_text_encoder_feature_loss_item, global_step)
-            writer.add_scalar('损失/实际训练损失_单步', current_total_loss_item, global_step)
-            writer.add_scalar('学习率/LoRA学习率', current_lr, global_step)
-            writer.add_scalar('教师模型/当前选择', current_teacher_idx + 1, global_step)
+            # Basic loss logging
+            writer.add_scalar('loss/noise_prediction_loss_per_step', current_noise_loss_item, global_step)
+            writer.add_scalar('loss/UNet_feature_alignment_loss_per_step', current_unet_feature_loss_item, global_step)
+            writer.add_scalar('loss/TextEncoder_feature_alignment_loss_per_step', current_text_encoder_feature_loss_item, global_step)
+            writer.add_scalar('loss/actual_training_loss_per_step', current_total_loss_item, global_step)
+            writer.add_scalar('learning_rate/LoRA_learning_rate', current_lr, global_step)
+            writer.add_scalar('teacher_model/current_selection', current_teacher_idx + 1, global_step)
             
-            # 🔥 混合损失分解记录
-            writer.add_scalar('混合损失_UNet/主损失(MSE)', unet_primary_loss, global_step)
-            writer.add_scalar('混合损失_UNet/次损失(Cosine)', unet_secondary_loss, global_step)
-            writer.add_scalar('混合损失_Text/主损失(MSE)', text_primary_loss, global_step)
-            writer.add_scalar('混合损失_Text/次损失(Cosine)', text_secondary_loss, global_step)
+            # 🔥 Hybrid loss decomposition logging
+            writer.add_scalar('hybrid_loss_UNet/primary_loss(MSE)', unet_primary_loss, global_step)
+            writer.add_scalar('hybrid_loss_UNet/secondary_loss(Cosine)', unet_secondary_loss, global_step)
+            writer.add_scalar('hybrid_loss_Text/primary_loss(MSE)', text_primary_loss, global_step)
+            writer.add_scalar('hybrid_loss_Text/secondary_loss(Cosine)', text_secondary_loss, global_step)
             
-            # 交替优化特有记录
+            # Alternating optimization specific logging
             if use_alternating_optimization:
-                writer.add_scalar('交替优化/当前模式', 1 if current_mode == "noise" else 2, global_step)  # 1=noise, 2=feature
-                writer.add_scalar('交替优化/模式切换次数', alt_controller.mode_switch_count, global_step)
-                writer.add_scalar('交替优化/距离上次切换步数', global_step - alt_controller.last_switch_step, global_step)
+                writer.add_scalar('alternating_optimization/current_mode', 1 if current_mode == "noise" else 2, global_step)  # 1=noise, 2=feature
+                writer.add_scalar('alternating_optimization/mode_switch_count', alt_controller.mode_switch_count, global_step)
+                writer.add_scalar('alternating_optimization/steps_since_last_switch', global_step - alt_controller.last_switch_step, global_step)
                 
-                # 记录优化效果趋势
+                # Record optimization effect trends
                 if len(alt_controller.noise_loss_history) >= 5:
                     recent_noise_trend = (alt_controller.noise_loss_history[-1] - alt_controller.noise_loss_history[-5]) / (alt_controller.noise_loss_history[-5] + 1e-8)
-                    writer.add_scalar('交替优化/噪声损失趋势', recent_noise_trend, global_step)
+                    writer.add_scalar('alternating_optimization/noise_loss_trend', recent_noise_trend, global_step)
                 
                 if len(alt_controller.feature_loss_history) >= 5:
                     recent_feature_trend = (alt_controller.feature_loss_history[-1] - alt_controller.feature_loss_history[-5]) / (alt_controller.feature_loss_history[-5] + 1e-8)
-                    writer.add_scalar('交替优化/特征损失趋势', recent_feature_trend, global_step)
+                    writer.add_scalar('alternating_optimization/feature_loss_trend', recent_feature_trend, global_step)
             else:
-                # 传统模式的权重记录
-                writer.add_scalar('权重/噪声预测权重', noise_pred_weight, global_step)
-                writer.add_scalar('权重/UNet特征对齐权重', feature_align_weight, global_step)
-                writer.add_scalar('权重/TextEncoder特征对齐权重', text_encoder_feature_align_weight, global_step)
+                # Weight logging for traditional mode
+                writer.add_scalar('weight/noise_prediction_weight', noise_pred_weight, global_step)
+                writer.add_scalar('weight/UNet_feature_alignment_weight', feature_align_weight, global_step)
+                writer.add_scalar('weight/TextEncoder_feature_alignment_weight', text_encoder_feature_align_weight, global_step)
 
-            # 按teacher分类的混合损失记录
+            # Hybrid loss logging categorized by teacher
             teacher_name_for_tb = f"Teacher_{current_teacher_idx+1:02d}"
-            writer.add_scalar(f'Teacher损失/{teacher_name_for_tb}/噪声预测损失_单步', current_noise_loss_item, global_step)
-            writer.add_scalar(f'Teacher损失/{teacher_name_for_tb}/UNet特征对齐损失_单步', current_unet_feature_loss_item, global_step)
-            writer.add_scalar(f'Teacher损失/{teacher_name_for_tb}/TextEncoder特征对齐损失_单步', current_text_encoder_feature_loss_item, global_step)
-            writer.add_scalar(f'Teacher损失/{teacher_name_for_tb}/总损失_单步', current_total_loss_item, global_step)
+            writer.add_scalar(f'teacher_loss/{teacher_name_for_tb}/noise_prediction_loss_per_step', current_noise_loss_item, global_step)
+            writer.add_scalar(f'teacher_loss/{teacher_name_for_tb}/UNet_feature_alignment_loss_per_step', current_unet_feature_loss_item, global_step)
+            writer.add_scalar(f'teacher_loss/{teacher_name_for_tb}/TextEncoder_feature_alignment_loss_per_step', current_text_encoder_feature_loss_item, global_step)
+            writer.add_scalar(f'teacher_loss/{teacher_name_for_tb}/total_loss_per_step', current_total_loss_item, global_step)
             
-            # 🔥 当前teacher的混合损失分解
-            writer.add_scalar(f'Teacher混合损失/{teacher_name_for_tb}/UNet主损失_单步', unet_primary_loss, global_step)
-            writer.add_scalar(f'Teacher混合损失/{teacher_name_for_tb}/UNet次损失_单步', unet_secondary_loss, global_step)
-            writer.add_scalar(f'Teacher混合损失/{teacher_name_for_tb}/Text主损失_单步', text_primary_loss, global_step)
-            writer.add_scalar(f'Teacher混合损失/{teacher_name_for_tb}/Text次损失_单步', text_secondary_loss, global_step)
+            # 🔥 Current teacher's hybrid loss decomposition
+            writer.add_scalar(f'teacher_hybrid_loss/{teacher_name_for_tb}/UNet_primary_loss_per_step', unet_primary_loss, global_step)
+            writer.add_scalar(f'teacher_hybrid_loss/{teacher_name_for_tb}/UNet_secondary_loss_per_step', unet_secondary_loss, global_step)
+            writer.add_scalar(f'teacher_hybrid_loss/{teacher_name_for_tb}/Text_primary_loss_per_step', text_primary_loss, global_step)
+            writer.add_scalar(f'teacher_hybrid_loss/{teacher_name_for_tb}/Text_secondary_loss_per_step', text_secondary_loss, global_step)
             
-            # 🔥 记录各层的混合特征损失详细信息
+            # 🔥 Log per-layer hybrid feature loss detailed information
             if isinstance(unet_detailed_loss_info, dict):
                 for layer_name, layer_loss in unet_detailed_loss_info.items():
                     clean_layer_name = layer_name.replace(".", "_")
                     
-                    # 🔥 安全的类型转换函数
+                    # 🔥 Safe type conversion function
                     def safe_convert_to_float(value, layer_name):
-                        """安全地将值转换为float，用于TensorBoard记录"""
+                        """Safely convert a value to float for TensorBoard logging"""
                         if isinstance(value, (int, float)):
                             return float(value)
                         elif isinstance(value, torch.Tensor):
                             if value.numel() == 1:
                                 return value.item()
                             else:
-                                print(f"⚠️ 跳过多元素tensor: {layer_name} (shape: {value.shape})")
+                                print(f"⚠️ Skipping multi-element tensor: {layer_name} (shape: {value.shape})")
                                 return None
                         elif isinstance(value, str):
-                            # 检查是否是数字字符串
+                            # Check if it's a numeric string
                             try:
                                 return float(value)
                             except (ValueError, TypeError):
-                                # 如果是配置字符串（如"hybrid"），静默跳过
+                                # If it is a config string (e.g., "hybrid"), silently skip
                                 if value not in ['hybrid', 'mse', 'cosine', 'scale_aware_cosine', 'layer_adaptive']:
-                                    print(f"⚠️ 无法转换字符串为float: {layer_name}={value}")
+                                    print(f"⚠️ Cannot convert string to float: {layer_name}={value}")
                                 return None
                         else:
-                            print(f"⚠️ 未知类型无法转换: {layer_name}={value} (类型: {type(value)})")
+                            print(f"⚠️ Unknown type cannot be converted: {layer_name}={value} (type: {type(value)})")
                             return None
                     
-                    # 尝试转换并记录
+                    # Try to convert and log
                     converted_value = safe_convert_to_float(layer_loss, layer_name)
                     if converted_value is not None:
-                        writer.add_scalar(f'UNet混合特征损失_层/{clean_layer_name}', 
+                        writer.add_scalar(f'UNet_hybrid_feature_loss_layer/{clean_layer_name}', 
                                         converted_value, global_step)
-                        # 按teacher分类记录
-                        writer.add_scalar(f'Teacher_UNet混合层损失/{teacher_name_for_tb}/{clean_layer_name}', 
+                        # Log categorized by teacher
+                        writer.add_scalar(f'teacher_UNet_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
                                         converted_value, global_step)
             
             if isinstance(text_detailed_loss_info, dict):
                 for layer_name, layer_loss in text_detailed_loss_info.items():
                     clean_layer_name = layer_name.replace(".", "_")
                     
-                    # 使用相同的安全转换函数
+                    # Use the same safe conversion function
                     converted_value = safe_convert_to_float(layer_loss, layer_name)
                     if converted_value is not None:
-                        writer.add_scalar(f'TextEncoder混合特征损失_层/{clean_layer_name}', 
+                        writer.add_scalar(f'TextEncoder_hybrid_feature_loss_layer/{clean_layer_name}', 
                                         converted_value, global_step)
-                        # 按teacher分类记录
-                        writer.add_scalar(f'Teacher_TextEncoder混合层损失/{teacher_name_for_tb}/{clean_layer_name}', 
+                        # Log categorized by teacher
+                        writer.add_scalar(f'teacher_TextEncoder_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
                                         converted_value, global_step)
 
         global_step += 1
 
-        # --- 🔥 保存检查点（包含混合损失信息） ---
+        # --- 🔥 Save checkpoint (including hybrid loss information) ---
         if global_step > 0 and global_step % save_steps == 0:
-            # 计算区间平均损失
+            # Compute interval average loss
             avg_total_loss_interval = accumulated_total_loss / step_count_in_interval if step_count_in_interval > 0 else 0.0
             avg_noise_loss_interval = accumulated_noise_loss / step_count_in_interval if step_count_in_interval > 0 else 0.0
             avg_unet_feature_loss_interval = accumulated_unet_feature_loss / step_count_in_interval if step_count_in_interval > 0 else 0.0
             avg_text_encoder_feature_loss_interval = accumulated_text_encoder_feature_loss / step_count_in_interval if step_count_in_interval > 0 else 0.0
 
             print(f"\n" + "="*60)
-            print(f"🔥 MULTI-TEACHER 混合损失 LoRA CHECKPOINT - Step {global_step}/{num_steps}")
+            print(f"🔥 MULTI-TEACHER hybrid loss LoRA CHECKPOINT - Step {global_step}/{num_steps}")
             if use_alternating_optimization:
-                print(f"交替优化模式 - 当前优化: {current_mode.upper()}")
-                print(f"模式切换次数: {alt_controller.mode_switch_count}")
+                print(f"Alternating optimization mode - currently optimizing: {current_mode.upper()}")
+                print(f"Mode switch count: {alt_controller.mode_switch_count}")
             else:
-                print(f"联合混合损失优化模式")
+                print(f"Joint hybrid loss optimization mode")
             print(f"="*60)
             
             print(f"Average Losses (last {step_count_in_interval} steps):")
