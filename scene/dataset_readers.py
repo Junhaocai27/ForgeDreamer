@@ -384,13 +384,13 @@ def GenerateCircleCameras(opt, size=8, render45 = False):
         cam_infos.append(RandCameraInfo(uid=idx, R=R, T=T, FovY=FovY, FovX=FovX,width=opt.image_w, 
                         height = opt.image_h, delta_polar = delta_polar,delta_azimuth = delta_azimuth, delta_radius = delta_radius))  
     if render45:
-        # print(f"[DEBUG] 开始生成45度视角相机")
+        # print(f"[DEBUG] Generating 45-degree view cameras")
         for idx in range(size):
             # thetas = torch.FloatTensor([opt.default_polar*2//3])
             thetas = torch.FloatTensor([55])
             phis = torch.FloatTensor([(idx / size) * 360])
             radius = torch.FloatTensor([opt.default_radius])
-            # print(f"[DEBUG] 45度相机 {idx}: theta={thetas.item()}, phi={phis.item()}, radius={radius.item()}")
+            # print(f"[DEBUG] 45-degree camera {idx}: theta={thetas.item()}, phi={phis.item()}, radius={radius.item()}")
             # random pose on the fly
             poses = circle_poses(radius=radius, theta=thetas, phi=phis, angle_overhead=opt.angle_overhead, angle_front=opt.angle_front)
             matrix = np.linalg.inv(poses[0])
@@ -408,30 +408,30 @@ def GenerateCircleCameras(opt, size=8, render45 = False):
             delta_radius = radius - opt.default_radius
             cam_infos.append(RandCameraInfo(uid=idx+size, R=R, T=T, FovY=FovY, FovX=FovX,width=opt.image_w, 
                             height = opt.image_h, delta_polar = delta_polar,delta_azimuth = delta_azimuth, delta_radius = delta_radius))         
-    # print(f"[DEBUG] 最终生成了 {size} 个相机")
+    # print(f"[DEBUG] Final camera count: {size}")
     return cam_infos
 
 # def GenerateRandomFixedAngleCameras(opt, size=2000, SSAA=True, angle_ratio=0.5):
 #     """
-#     生成随机相机，但角度只保持正面和45度视角
+#     Generate random cameras with only front and 45-degree viewing angles
     
-#     参数:
-#         opt: 配置选项
-#         size: 生成的相机数量
-#         SSAA: 是否启用超采样抗锯齿
-#         angle_ratio: 正面视角和45度视角的比例，默认0.5表示各占一半
+#     Args:
+#         opt: configuration options
+#         size: number of cameras to generate
+#         SSAA: whether to enable super-sampling anti-aliasing
+#         angle_ratio: ratio of front vs 45-degree views, default 0.5 means equal split
     
-#     返回:
-#         cam_infos: 相机信息列表
+#     Returns:
+#         cam_infos: list of camera info
 #     """
     
-#     # 计算正面和45度视角的数量
+#     # Compute number of front and 45-degree view cameras
 #     front_view_count = int(size * angle_ratio)
 #     angle45_view_count = size - front_view_count
     
 #     cam_infos = []
     
-#     # 设置图像尺寸
+#     # Set image dimensions
 #     if SSAA:
 #         ssaa = opt.SSAA
 #     else:
@@ -440,21 +440,21 @@ def GenerateCircleCameras(opt, size=8, render45 = False):
 #     image_h = opt.image_h * ssaa
 #     image_w = opt.image_w * ssaa
     
-#     # 生成正面视角相机
+#     # Generate front-view cameras
 #     for idx in range(front_view_count):
-#         # 固定极角为默认正面视角
+#         # Fix polar angle to default front view
 #         thetas = torch.FloatTensor([opt.default_polar])
         
-#         # 随机方位角
+#         # Random azimuth angle
 #         phis = torch.FloatTensor([random.random() * 360])
         
-#         # 随机半径
+#         # Random radius
 #         radius = gen_random_pos(1, opt.radius_range, opt.rand_cam_gamma)
         
-#         # 随机焦距
+#         # Random focal length
 #         fov = random.random() * (opt.fovy_range[1] - opt.fovy_range[0]) + opt.fovy_range[0]
         
-#         # 生成相机姿态
+#         # Generate camera pose
 #         poses = circle_poses(
 #             radius=radius, 
 #             theta=thetas, 
@@ -463,21 +463,21 @@ def GenerateCircleCameras(opt, size=8, render45 = False):
 #             angle_front=opt.angle_front
 #         )
         
-#         # 计算相机矩阵
+#         # Compute camera matrix
 #         matrix = np.linalg.inv(poses[0])
 #         R = -np.transpose(matrix[:3,:3])
 #         R[:,0] = -R[:,0]
 #         T = -matrix[:3, 3]
         
-#         # 计算视场角
+#         # Compute field of view
 #         fovy = focal2fov(fov2focal(fov, image_h), image_w)
 #         FovY = fovy
 #         FovX = fov
         
-#         # 计算相对默认视角的差异
+#         # Compute delta relative to default view
 #         delta_polar = thetas - opt.default_polar
 #         delta_azimuth = phis - opt.default_azimuth
-#         delta_azimuth[delta_azimuth > 180] -= 360  # 范围在 [-180, 180]
+#         delta_azimuth[delta_azimuth > 180] -= 360  # range in [-180, 180]
 #         delta_radius = radius - opt.default_radius
         
 #         cam_infos.append(RandCameraInfo(
@@ -489,21 +489,21 @@ def GenerateCircleCameras(opt, size=8, render45 = False):
 #             delta_radius=delta_radius[0]
 #         ))
     
-#     # 生成45度视角相机
+#     # Generate 45-degree view cameras
 #     for idx in range(angle45_view_count):
-#         # 固定极角为45度视角
+#         # Fix polar angle to 45-degree view
 #         thetas = torch.FloatTensor([opt.default_polar * 2 // 3])
         
-#         # 随机方位角
+#         # Random azimuth angle
 #         phis = torch.FloatTensor([random.random() * 360])
         
-#         # 随机半径
+#         # Random radius
 #         radius = gen_random_pos(1, opt.radius_range, opt.rand_cam_gamma)
         
-#         # 随机焦距
+#         # Random focal length
 #         fov = random.random() * (opt.fovy_range[1] - opt.fovy_range[0]) + opt.fovy_range[0]
         
-#         # 生成相机姿态
+#         # Generate camera pose
 #         poses = circle_poses(
 #             radius=radius, 
 #             theta=thetas, 
@@ -512,21 +512,21 @@ def GenerateCircleCameras(opt, size=8, render45 = False):
 #             angle_front=opt.angle_front
 #         )
         
-#         # 计算相机矩阵
+#         # Compute camera matrix
 #         matrix = np.linalg.inv(poses[0])
 #         R = -np.transpose(matrix[:3,:3])
 #         R[:,0] = -R[:,0]
 #         T = -matrix[:3, 3]
         
-#         # 计算视场角
+#         # Compute field of view
 #         fovy = focal2fov(fov2focal(fov, image_h), image_w)
 #         FovY = fovy
 #         FovX = fov
         
-#         # 计算相对默认视角的差异
+#         # Compute delta relative to default view
 #         delta_polar = thetas - opt.default_polar
 #         delta_azimuth = phis - opt.default_azimuth
-#         delta_azimuth[delta_azimuth > 180] -= 360  # 范围在 [-180, 180]
+#         delta_azimuth[delta_azimuth > 180] -= 360  # range in [-180, 180]
 #         delta_radius = radius - opt.default_radius
         
 #         cam_infos.append(RandCameraInfo(
@@ -538,14 +538,14 @@ def GenerateCircleCameras(opt, size=8, render45 = False):
 #             delta_radius=delta_radius[0]
 #         ))
     
-#     # 随机打乱相机顺序，避免前半部分都是正面视角
+#     # Shuffle camera order to avoid all front-view cameras in first half
 #     random.shuffle(cam_infos)
     
-#     # 重新分配uid以保持连续性
+#     # Re-assign uid for continuity
 #     for i, cam_info in enumerate(cam_infos):
 #         cam_infos[i] = cam_info._replace(uid=i)
     
-#     print(f"[INFO] 生成了 {front_view_count} 个正面视角相机和 {angle45_view_count} 个45度视角相机，总计 {size} 个")
+#     print(f"[INFO] Generated {front_view_count} front-view cameras and {angle45_view_count} 45-degree cameras, total {size}")
     
 #     return cam_infos
 
@@ -553,40 +553,40 @@ def GenerateRandomFixedAngleCameras(opt, size=2000, SSAA=True, random_ratio=True
                                    min_front_ratio=0.3, max_front_ratio=0.7,
                                    angle_jitter=True, max_jitter_degrees=1.0):
     """
-    生成随机相机，但角度只保持正面和45度视角，并可选择添加角度偏移
+    Generate random cameras with only front and 45-degree viewing angles, optionally with angle jitter
     
-    参数:
-        opt: 配置选项
-        size: 生成的相机数量
-        SSAA: 是否启用超采样抗锯齿
-        random_ratio: 是否使用随机比例，默认为True
-        min_front_ratio: 正面视角的最小比例，默认0.3
-        max_front_ratio: 正面视角的最大比例，默认0.7
-        angle_jitter: 是否添加角度抖动，默认为True
-        max_jitter_degrees: 最大抖动角度（度），默认为5.0
+    Args:
+        opt: configuration options
+        size: number of cameras to generate
+        SSAA: whether to enable super-sampling anti-aliasing
+        random_ratio: whether to use a random ratio, default True
+        min_front_ratio: minimum fraction of front-view cameras, default 0.3
+        max_front_ratio: maximum fraction of front-view cameras, default 0.7
+        angle_jitter: whether to add angle jitter, default True
+        max_jitter_degrees: maximum jitter in degrees, default 5.0
     
-    返回:
-        cam_infos: 相机信息列表
+    Returns:
+        cam_infos: list of camera info
     """
     
-    # 使用随机比例或固定比例
+    # Use random ratio or fixed ratio
     if random_ratio:
-        # 随机决定正面视角的比例
+        # Randomly determine front-view fraction
         front_ratio = random.uniform(min_front_ratio, max_front_ratio)
     else:
-        # 使用固定比例（向后兼容）
+        # Use fixed ratio (backward compatible)
         front_ratio = 0.5
     
-    # 计算正面和45度视角的数量
+    # Compute number of front and 45-degree view cameras
     front_view_count = int(size * front_ratio)
     angle45_view_count = size - front_view_count
     
-    jitter_info = f"(抖动±{max_jitter_degrees}°)" if angle_jitter else "(固定角度)"
-    print(f"[INFO] 随机分配: {front_view_count} 个正面视角相机 ({front_ratio:.1%}) 和 {angle45_view_count} 个45度视角相机 ({1-front_ratio:.1%}) {jitter_info}")
+    jitter_info = f"(jitter±{max_jitter_degrees}°)" if angle_jitter else "(fixed angles)"
+    print(f"[INFO] Random split: {front_view_count} front-view cameras ({front_ratio:.1%}) and {angle45_view_count} 45-degree cameras ({1-front_ratio:.1%}) {jitter_info}")
     
     cam_infos = []
     
-    # 设置图像尺寸
+    # Set image dimensions
     if SSAA:
         ssaa = opt.SSAA
     else:
@@ -595,27 +595,27 @@ def GenerateRandomFixedAngleCameras(opt, size=2000, SSAA=True, random_ratio=True
     image_h = opt.image_h * ssaa
     image_w = opt.image_w * ssaa
     
-    # 生成正面视角相机
+    # Generate front-view cameras
     for idx in range(front_view_count):
-        # 基础极角为默认正面视角
+        # Base polar angle is default front view
         base_theta = opt.default_polar
         
-        # 添加角度抖动
+        # Add angle jitter
         if angle_jitter:
-            # 对极角添加小幅度随机偏移
+            # Add small random offset to polar angle
             theta_jitter = random.uniform(-max_jitter_degrees, max_jitter_degrees)
             actual_theta = base_theta + theta_jitter
-            # 确保角度在合理范围内
-            actual_theta = max(10, min(170, actual_theta))  # 限制在10-170度之间
+            # Clamp to valid range
+            actual_theta = max(10, min(170, actual_theta))  # limit to 10-170 degrees
         else:
             actual_theta = base_theta
             
         thetas = torch.FloatTensor([actual_theta])
         
-        # 随机方位角
+        # Random azimuth
         base_phi = random.random() * 360
         if angle_jitter:
-            # 对方位角也添加小幅度偏移（可选）
+            # Also add small offset to azimuth (optional)
             phi_jitter = random.uniform(-max_jitter_degrees, max_jitter_degrees)
             actual_phi = (base_phi + phi_jitter) % 360
         else:
@@ -623,13 +623,13 @@ def GenerateRandomFixedAngleCameras(opt, size=2000, SSAA=True, random_ratio=True
             
         phis = torch.FloatTensor([actual_phi])
         
-        # 随机半径
+        # Random radius
         radius = gen_random_pos(1, opt.radius_range, opt.rand_cam_gamma)
         
-        # 随机焦距
+        # Random focal length
         fov = random.random() * (opt.fovy_range[1] - opt.fovy_range[0]) + opt.fovy_range[0]
         
-        # 生成相机姿态
+        # Generate camera pose
         poses = circle_poses(
             radius=radius, 
             theta=thetas, 
@@ -638,21 +638,21 @@ def GenerateRandomFixedAngleCameras(opt, size=2000, SSAA=True, random_ratio=True
             angle_front=opt.angle_front
         )
         
-        # 计算相机矩阵
+        # Compute camera matrix
         matrix = np.linalg.inv(poses[0])
         R = -np.transpose(matrix[:3,:3])
         R[:,0] = -R[:,0]
         T = -matrix[:3, 3]
         
-        # 计算视场角
+        # Compute field of view
         fovy = focal2fov(fov2focal(fov, image_h), image_w)
         FovY = fovy
         FovX = fov
         
-        # 计算相对默认视角的差异
+        # Compute delta relative to default view
         delta_polar = thetas - opt.default_polar
         delta_azimuth = phis - opt.default_azimuth
-        delta_azimuth[delta_azimuth > 180] -= 360  # 范围在 [-180, 180]
+        delta_azimuth[delta_azimuth > 180] -= 360  # range in [-180, 180]
         delta_radius = radius - opt.default_radius
         
         cam_infos.append(RandCameraInfo(
@@ -664,32 +664,32 @@ def GenerateRandomFixedAngleCameras(opt, size=2000, SSAA=True, random_ratio=True
             delta_radius=delta_radius[0]
         ))
     
-    # 生成45度视角相机
+    # Generate 45-degree view cameras
     for idx in range(angle45_view_count):
-        # 基础45度视角
+        # Base 45-degree view
         base_theta = 55.0
         
-        # 添加角度抖动
+        # Add angle jitter
         if angle_jitter:
-            # 对极角添加小幅度随机偏移
+            # Add small random offset to polar angle
             theta_jitter = random.uniform(-max_jitter_degrees, max_jitter_degrees)
             actual_theta = base_theta + theta_jitter
-            # 确保角度在合理范围内
-            actual_theta = max(10, min(80, actual_theta))  # 限制在10-80度之间，避免过于接近顶视角
+            # Clamp to valid range
+            actual_theta = max(10, min(80, actual_theta))  # limit to 10-80 degrees, avoid getting too close to top view
         else:
             actual_theta = base_theta
             
         thetas = torch.FloatTensor([actual_theta])
         
         if angle_jitter:
-            print(f"[DEBUG] 生成45度相机 {idx}: theta={actual_theta:.1f}度 (基础55° + 抖动{actual_theta-55:.1f}°)")
+            print(f"[DEBUG] 45-degree camera {idx}: theta={actual_theta:.1f}deg (base 55° + jitter {actual_theta-55:.1f}°)")
         else:
-            print(f"[DEBUG] 生成45度相机 {idx}: theta={actual_theta:.1f}度")
+            print(f"[DEBUG] 45-degree camera {idx}: theta={actual_theta:.1f}deg")
         
-        # 随机方位角
+        # Random azimuth
         base_phi = random.random() * 360
         if angle_jitter:
-            # 对方位角也添加小幅度偏移
+            # Also add small offset to azimuth
             phi_jitter = random.uniform(-max_jitter_degrees, max_jitter_degrees)
             actual_phi = (base_phi + phi_jitter) % 360
         else:
@@ -697,13 +697,13 @@ def GenerateRandomFixedAngleCameras(opt, size=2000, SSAA=True, random_ratio=True
             
         phis = torch.FloatTensor([actual_phi])
         
-        # 随机半径
+        # Random radius
         radius = gen_random_pos(1, opt.radius_range, opt.rand_cam_gamma)
         
-        # 随机焦距
+        # Random focal length
         fov = random.random() * (opt.fovy_range[1] - opt.fovy_range[0]) + opt.fovy_range[0]
         
-        # 生成相机姿态
+        # Generate camera pose
         poses = circle_poses(
             radius=radius, 
             theta=thetas, 
@@ -712,21 +712,21 @@ def GenerateRandomFixedAngleCameras(opt, size=2000, SSAA=True, random_ratio=True
             angle_front=opt.angle_front
         )
         
-        # 计算相机矩阵
+        # Compute camera matrix
         matrix = np.linalg.inv(poses[0])
         R = -np.transpose(matrix[:3,:3])
         R[:,0] = -R[:,0]
         T = -matrix[:3, 3]
         
-        # 计算视场角
+        # Compute field of view
         fovy = focal2fov(fov2focal(fov, image_h), image_w)
         FovY = fovy
         FovX = fov
         
-        # 计算相对默认视角的差异
+        # Compute delta relative to default view
         delta_polar = thetas - opt.default_polar
         delta_azimuth = phis - opt.default_azimuth
-        delta_azimuth[delta_azimuth > 180] -= 360  # 范围在 [-180, 180]
+        delta_azimuth[delta_azimuth > 180] -= 360  # range in [-180, 180]
         delta_radius = radius - opt.default_radius
         
         cam_infos.append(RandCameraInfo(
@@ -738,14 +738,14 @@ def GenerateRandomFixedAngleCameras(opt, size=2000, SSAA=True, random_ratio=True
             delta_radius=delta_radius[0]
         ))
     
-    # 随机打乱相机顺序，避免前半部分都是正面视角
+    # Shuffle camera order to avoid all front-view cameras in first half
     random.shuffle(cam_infos)
     
-    # 重新分配uid以保持连续性
+    # Re-assign uid for continuity
     for i, cam_info in enumerate(cam_infos):
         cam_infos[i] = cam_info._replace(uid=i)
     
-    print(f"[INFO] 最终生成了 {front_view_count} 个正面视角相机和 {angle45_view_count} 个45度视角相机，总计 {size} 个")
+    print(f"[INFO] Final: {front_view_count} front-view cameras and {angle45_view_count} 45-degree cameras, total {size}")
     
     return cam_infos
 
@@ -821,35 +821,35 @@ def GeneratePurnCameras(opt, size=300):
 
 def GenerateRotatingBatchCameras(opt, current_iter, total_iters=5000, views_per_iter=4):
     """
-    生成每次迭代的多个环绕相机视角，随着迭代次数增加而逐渐环绕物体360度
+    Generate multiple surrounding camera views per iteration, gradually revolving 360 degrees as iteration count increases
     
-    参数:
-        opt: 配置选项
-        current_iter: 当前迭代次数 (0-5000)
-        total_iters: 完成一个360度旋转所需的总迭代次数，默认为5000
-        views_per_iter: 每次迭代生成的视角数量，默认为4
+    Args:
+        opt: configuration options
+        current_iter: current iteration count (0-5000)
+        total_iters: total iterations to complete one 360-degree revolution, default 5000
+        views_per_iter: number of views generated per iteration, default 4
     
-    返回:
-        batch_cameras: 当前迭代的多个相机信息列表
+    Returns:
+        batch_cameras: list of camera info for the current iteration
     """
-    # 计算当前基准角度
+    # Compute current base angle
     base_phi = (current_iter / total_iters) * 360.0
     
-    # 创建一个空的相机信息列表
+    # Create empty camera info list
     batch_cameras = []
     
-    # 在每次迭代中生成views_per_iter个均匀分布的相机视角
+    # Generate views_per_iter evenly distributed camera views per iteration
     for i in range(views_per_iter):
-        # 计算当前视角的方位角 - 在基准角度基础上均匀分布
+        # Compute current azimuth - evenly distributed around base angle
         current_phi = (base_phi + (i * 360.0 / views_per_iter)) % 360.0
         
-        # 设置相机参数
+        # Set camera parameters
         fov = opt.default_fovy
-        thetas = torch.FloatTensor([opt.default_polar])  # 使用默认极角
-        phis = torch.FloatTensor([current_phi])          # 当前方位角
-        radius = torch.FloatTensor([opt.default_radius]) # 使用默认半径
+        thetas = torch.FloatTensor([opt.default_polar])  # use default polar angle
+        phis = torch.FloatTensor([current_phi])          # current azimuth
+        radius = torch.FloatTensor([opt.default_radius]) # use default radius
         
-        # 生成相机姿态
+        # Generate camera pose
         poses = circle_poses(
             radius=radius, 
             theta=thetas, 
@@ -858,26 +858,26 @@ def GenerateRotatingBatchCameras(opt, current_iter, total_iters=5000, views_per_
             angle_front=opt.angle_front
         )
         
-        # 计算相机矩阵
+        # Compute camera matrix
         matrix = np.linalg.inv(poses[0])
         R = -np.transpose(matrix[:3,:3])
         R[:,0] = -R[:,0]
         T = -matrix[:3, 3]
         
-        # 计算视场角
+        # Compute field of view
         fovy = focal2fov(fov2focal(fov, opt.image_h), opt.image_w)
         FovY = fovy
         FovX = fov
         
-        # 计算相对默认视角的差异
+        # Compute delta relative to default view
         delta_polar = thetas - opt.default_polar
         delta_azimuth = phis - opt.default_azimuth
-        delta_azimuth[delta_azimuth > 180] -= 360  # 范围在 [-180, 180]
+        delta_azimuth[delta_azimuth > 180] -= 360  # range in [-180, 180]
         delta_radius = radius - opt.default_radius
         
-        # 创建相机信息对象
+        # Create camera info object
         camera_info = RandCameraInfo(
-            uid=current_iter * views_per_iter + i,  # 为每个相机分配唯一ID
+            uid=current_iter * views_per_iter + i,  # assign a unique ID to each camera
             R=R, 
             T=T, 
             FovY=FovY, 
@@ -889,25 +889,25 @@ def GenerateRotatingBatchCameras(opt, current_iter, total_iters=5000, views_per_
             delta_radius=delta_radius
         )
         
-        # 添加到相机列表
+        # Add to camera list
         batch_cameras.append(camera_info)
     
     return batch_cameras
 
 def GenerateFullCoverageCameras(opt, current_iter, total_iters=5000, views_per_iter=2, render45=True, num_cycles=10):
     """
-    生成均匀覆盖360度的相机视角，确保在整个训练过程中所有角度都能得到多次更新
+    Generate camera views that evenly cover 360 degrees, ensuring all angles are updated multiple times during training
     
-    参数:
-        opt: 配置选项
-        current_iter: 当前迭代次数 (0-5000)
-        total_iters: 总迭代次数，默认为5000
-        views_per_iter: 每次迭代生成的正面视角数量，默认为2
-        render45: 是否生成45度视角相机，默认为True
-        num_cycles: 将总迭代次数分成多少个完整周期，默认为10（即每500次迭代完成一个360度周期）
+    Args:
+        opt: configuration options
+        current_iter: current iteration count (0-5000)
+        total_iters: total iteration count, default 5000
+        views_per_iter: number of front-view cameras per iteration, default 2
+        render45: whether to generate 45-degree view cameras, default True
+        num_cycles: number of full cycles to divide total iterations into, default 10 (i.e., one 360-degree cycle every 500 iterations)
     
-    返回:
-        batch_cameras: 当前迭代的多个相机信息列表
+    Returns:
+        batch_cameras: list of camera info for the current iteration
     """
     cycle_length = total_iters // num_cycles
     current_cycle = current_iter // cycle_length
@@ -916,7 +916,7 @@ def GenerateFullCoverageCameras(opt, current_iter, total_iters=5000, views_per_i
 
     batch_cameras = []
     
-    # 生成正面视角相机
+    # Generate front-view cameras
     for i in range(views_per_iter):
         current_phi = (base_phi + (i * 360.0 / views_per_iter)) % 360.0
         thetas = torch.FloatTensor([opt.default_polar])  
@@ -944,13 +944,13 @@ def GenerateFullCoverageCameras(opt, current_iter, total_iters=5000, views_per_i
             delta_polar=delta_polar, delta_azimuth=delta_azimuth, delta_radius=delta_radius
         ))
 
-    # 生成 45 度视角相机
+    # Generate 45-degree view cameras
     if render45:
-        print(f"[DEBUG] 开始生成45度视角相机")
+        print(f"[DEBUG] Generating 45-degree view cameras")
         for i in range(views_per_iter):
             current_phi = (base_phi + (i * 360.0 / views_per_iter)) % 360.0
-            thetas = torch.FloatTensor([opt.default_polar * (2 / 3)])  # 确保是 45° 视角
-            print(f"[DEBUG] 45度相机 {i}: theta={thetas.item()}, phi={current_phi}")
+            thetas = torch.FloatTensor([opt.default_polar * (2 / 3)])  # ensure 45° view
+            print(f"[DEBUG] 45-degree camera {i}: theta={thetas.item()}, phi={current_phi}")
             phis = torch.FloatTensor([current_phi])
             radius = torch.FloatTensor([opt.default_radius])
 
@@ -974,7 +974,7 @@ def GenerateFullCoverageCameras(opt, current_iter, total_iters=5000, views_per_i
                 width=opt.image_w, height=opt.image_h, 
                 delta_polar=delta_polar, delta_azimuth=delta_azimuth, delta_radius=delta_radius
             ))
-    print(f"[DEBUG] 最终生成了 {len(batch_cameras)} 个相机")
+    print(f"[DEBUG] Final camera count: {len(batch_cameras)}")
     return batch_cameras
 
 

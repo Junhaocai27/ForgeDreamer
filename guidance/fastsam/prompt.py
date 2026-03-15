@@ -368,7 +368,7 @@ class FastSAMPrompt:
             if np.sum(mask['segmentation']) <= 100:
                 filter_id.append(_)
                 continue
-            bbox = self._get_bbox_from_mask(mask['segmentation'])  # mask 的 bbox
+            bbox = self._get_bbox_from_mask(mask['segmentation'])  # bounding box of the mask
             cropped_boxes.append(self._segment_image(image, bbox))  
             # cropped_boxes.append(segment_image(image,mask["segmentation"]))
             cropped_images.append(bbox)  # Save the bounding box of the cropped image.
