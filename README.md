@@ -79,7 +79,7 @@ We recommend using Anaconda to manage the environment. Please follow the steps b
 
 ```bash
 # 1. Clone the repository with submodules
-git clone [https://github.com/Junhaocai27/ForgeDreamer.git](https://github.com/Junhaocai27/ForgeDreamer.git) --recursive
+git clone https://github.com/Junhaocai27/ForgeDreamer.git --recursive
 cd ./ForgeDreamer
 
 # 2. Create and activate the Conda environment
@@ -97,3 +97,203 @@ pip install dhg==0.9.5 --no-deps
 pip install submodules/diff-gaussian-rasterization --no-build-isolation
 pip install submodules/simple-knn/ --no-build-isolation
 pip install ./LoRA_Distillation --no-build-isolation
+```
+
+---
+
+## 🗂️ Repository Structure
+
+```
+ForgeDreamer/
+├── train.py                                  # Main Text-to-3D training script
+├── train.sh                                  # Shell script to launch train.py
+├── configs/
+│   └── screw.yaml                            # Example YAML configuration
+├── guidance/
+│   ├── sd_utils.py                           # SD guidance utilities (ISM/SDS, DHG hypergraph)
+│   ├── hypergraph_enhancer.py                # DHG latent hypergraph gradient enhancer
+│   ├── perpneg_utils.py                      # Perpendicular-negative weighting utilities
+│   ├── mask_utils.py                         # Subject mask generation (HSV-based)
+│   └── sd_step.py                            # DDIM step helper
+├── gaussian_renderer/
+│   ├── __init__.py                           # Gaussian splatting renderer with augmentation
+│   └── network_gui.py                        # Network GUI connection handler
+├── scene/                                    # Scene and camera utilities
+├── utils/                                    # Shared utility functions
+└── LoRA_Distillation/
+    ├── lora_diffusion/
+    │   ├── distill_lora.py                   # Multi-teacher LoRA distillation training script
+    │   ├── feature_hook_unet.py              # UNet feature alignment hooks & losses
+    │   ├── feature_hook_text_encoder.py      # Text encoder feature alignment hooks & losses
+    │   ├── dynamic_weight.py                 # Dynamic weight adjustment for distillation
+    │   └── ...                               # Other lora_diffusion package modules
+    └── training_scripts/
+        ├── train_lora.sh                     # Step 1: Train a single LoRA weight
+        └── distill_lora.sh                   # Step 2: Distil multiple LoRAs into one
+```
+
+---
+
+## 🚀 Four-Step Usage Workflow
+
+### Step 1 — Train individual LoRA weights
+
+Train a separate LoRA for each concept (object / viewpoint / appearance) you want the final model to capture. This uses the `lora_pti` command-line tool installed from the `LoRA_Distillation` package.
+
+**Script:** `LoRA_Distillation/training_scripts/train_lora.sh`
+
+Edit the variables at the top of the script before running:
+
+| Variable | Description |
+|---|---|
+| `MODEL_NAME` | Path or HuggingFace ID of the base SD model (e.g. `stabilityai/stable-diffusion-2-1-base`) |
+| `INSTANCE_DIR` | Directory containing training images for this concept |
+| `OUTPUT_DIR` | Where to save the resulting LoRA weights |
+| `--placeholder_tokens` | The trigger token for this concept (e.g. `<screw>`) |
+
+```bash
+bash LoRA_Distillation/training_scripts/train_lora.sh
+```
+
+Repeat this step for **every** concept. For example, you might train one LoRA for the front-view appearance (`<screw>`) and another for the top-down appearance (`<screw_up>`), saving each to a separate output directory.
+
+---
+
+### Step 2 — Distil multiple LoRA weights into one
+
+Once all per-concept LoRAs are trained, move all the resulting `.safetensors` / `.pt` files into a single folder and run the distillation script.
+
+**Script:** `LoRA_Distillation/training_scripts/distill_lora.sh`
+
+Edit the variables at the top of the script before running:
+
+| Variable | Description |
+|---|---|
+| `LORA_MODELS_DIR` | Directory containing all the individual LoRA weight files to distil |
+| `BASE_MODEL` | Path or HuggingFace ID of the base SD model |
+| `OUTPUT_DIR` | Where to save the distilled LoRA (auto-timestamped directory) |
+
+The script automatically infers placeholder tokens from filenames (e.g. `screw.safetensors` → token `<screw>`).
+
+```bash
+bash LoRA_Distillation/training_scripts/distill_lora.sh
+```
+
+The distilled LoRA is saved to:
+```
+$OUTPUT_DIR/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_<N>.safetensors
+```
+
+---
+
+### Step 3 — Configure the YAML file
+
+Edit `configs/screw.yaml` (or create your own config based on it) and update the following key fields:
+
+```yaml
+GuidanceParams:
+  model_key: 'stabilityai/stable-diffusion-2-1-base'      # Base SD model key or local path
+  text: 'A highly detailed ... <screw> ...'               # Prompt including your trigger token(s)
+  LoRA_path: "/path/to/final_multi_teacher_hybrid_lora_step_5000.safetensors"
+  negative: 'unrealistic, blurry, low quality, ...'       # Negative prompt
+  inverse_text: ''                                         # Text for DDIM inversion (ISM mode)
+
+ModelParams:
+  workspace: my_output_name    # Output folder name under ./output/
+```
+
+Key optional parameters in `GuidanceParams`:
+
+| Parameter | Default | Description |
+|---|---|---|
+| `perpneg` | `true` | Perpendicular-negative multi-view guidance |
+| `C_batch_size` | `4` | Number of camera views per SDS step |
+| `t_range` | `[0.02, 0.5]` | Diffusion timestep range for SDS sampling |
+| `guidance_scale` | `7.5` | Classifier-free guidance scale |
+| `ddim_inv` | `true` | Use DDIM inversion (ISM) instead of plain SDS |
+| `use_dhg_latent_hypergraph` | `true` | Enable DHG latent hypergraph gradient enhancement |
+| `fixed_view` | `true` | Use fixed front/up camera viewpoints |
+
+---
+
+### Step 4 — Run Text-to-3D generation
+
+**Script:** `train.sh`
+
+```bash
+bash train.sh
+```
+
+This runs:
+```bash
+CUDA_VISIBLE_DEVICES=0 python train.py --opt configs/screw.yaml
+```
+
+To use a different config file:
+```bash
+python train.py --opt configs/your_config.yaml
+```
+
+Training outputs (Gaussian point clouds, rendered images, videos, TensorBoard logs) are saved under `./output/<workspace>/`.
+
+Monitor training progress with TensorBoard:
+```bash
+tensorboard --logdir ./output/<workspace>
+```
+
+---
+
+## 📋 Configuration Reference
+
+### `GuidanceParams`
+
+| Key | Description |
+|---|---|
+| `model_key` | HuggingFace model ID or local path to the base SD model |
+| `text` | Text prompt (include LoRA trigger tokens, e.g. `<screw>`) |
+| `LoRA_path` | Path to the distilled LoRA `.safetensors` file |
+| `negative` | Negative prompt |
+| `inverse_text` | Text for DDIM inversion; leave empty `''` for default |
+| `perpneg` | Enable perpendicular-negative guidance (`true` recommended) |
+| `C_batch_size` | Number of cameras per SDS step |
+| `guidance_scale` | Classifier-free guidance scale |
+| `t_range` | `[min, max]` timestep fraction range for SDS sampling |
+| `ddim_inv` | Use ISM (DDIM inversion) rather than standard SDS |
+| `use_dhg_latent_hypergraph` | DHG latent hypergraph gradient enhancement |
+| `fixed_view` | Fix front/top-down camera viewpoints during training |
+| `tensorboard_log_dir` | Directory for TensorBoard logs |
+
+### `GenerateCamParams`
+
+| Key | Description |
+|---|---|
+| `init_shape` | Point cloud initialisation: `'pointe'` or `'sphere'` |
+| `init_prompt` | Prompt for Point-E initialisation (e.g. `'a thin rod'`) |
+| `phi_range` | Azimuth angle range in degrees |
+| `theta_range` | Elevation angle range in degrees |
+| `radius_range` | Camera-to-origin distance range |
+
+### `OptimizationParams`
+
+| Key | Description |
+|---|---|
+| `iterations` | Total training steps |
+| `warmup_iter` | Steps before enabling 45° view cameras |
+| `densify_from_iter` | Gaussians densification start step |
+| `densify_until_iter` | Gaussians densification end step |
+| `save_process` | Save a training-progress video (`true`/`false`) |
+
+---
+
+## 📄 Citation
+
+If you find ForgeDreamer useful for your research, please cite our paper:
+
+```bibtex
+@inproceedings{cai2026forgedreamer,
+  title     = {ForgeDreamer: Industrial Text-to-3D Generation with Multi-Expert LoRA and Cross-View Hypergraph},
+  author    = {Cai, Junhao and Zeng, Deyu and Pang, Junhao and Li, Lini and Wu, Zongze and Zhong, Xiaopin},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2026}
+}
+```
