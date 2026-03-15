@@ -5,9 +5,9 @@
 # 文件名格式: name.safetensors，对应的placeholder token为 <name>
 # 支持任意数量的LoRA模型进行多teacher蒸馏
 
-echo "="*80
+printf "%0.s=" {1..80} && echo
 echo "开始多Teacher LoRA蒸馏训练"
-echo "="*80
+printf "%0.s=" {1..80} && echo
 echo ""
 
 # 检查CUDA设备
@@ -16,7 +16,7 @@ echo ""
 
 # 设置环境变量
 # export CUDA_VISIBLE_DEVICES=3
-export PYTHONPATH="/root/lora:$PYTHONPATH"
+export PYTHONPATH="$(cd "$(dirname "$0")/../.."; pwd):$PYTHONPATH"
 
 # 训练配置
 LORA_MODELS_DIR="/root/lora_weight_before_distill/distill_weight8"
@@ -47,7 +47,7 @@ find "$LORA_MODELS_DIR" -name "*.safetensors" -o -name "*.pt" -o -name "*.pth" -
 echo ""
 
 # 运行多teacher蒸馏训练
-python /root/ForgeDreamer_FX/ForgeDreamer/LoRA_Distillation/lora_diffusion/distill_multi_lora_pic_good_result4.py \
+python "$(dirname "$0")/../lora_diffusion/distill_lora.py" \
   --lora_models_dir="$LORA_MODELS_DIR" \
   --pretrained_model_name_or_path="$BASE_MODEL" \
   --output_dir="$OUTPUT_DIR" \
@@ -92,10 +92,10 @@ python /root/ForgeDreamer_FX/ForgeDreamer/LoRA_Distillation/lora_diffusion/disti
 TRAIN_EXIT_CODE=$?
 
 echo ""
-echo "="*80
+printf "%0.s=" {1..80} && echo
 if [ $TRAIN_EXIT_CODE -eq 0 ]; then
     echo "✓ 多Teacher LoRA蒸馏训练成功完成!"
-    echo "="*80
+    printf "%0.s=" {1..80} && echo
     echo ""
     echo "训练结果:"
     echo "  最终模型保存到: $OUTPUT_DIR"
@@ -120,7 +120,7 @@ if [ $TRAIN_EXIT_CODE -eq 0 ]; then
     
 else
     echo "✗ 训练失败，退出码: $TRAIN_EXIT_CODE"
-    echo "="*80
+    printf "%0.s=" {1..80} && echo
     echo ""
     echo "请检查上面的错误信息"
     echo ""
@@ -131,4 +131,4 @@ fi
 # find /tmp -name "*torch*" -mtime +1 -delete 2>/dev/null || true
 
 echo "脚本执行完成"
-echo "="*80
+printf "%0.s=" {1..80} && echo

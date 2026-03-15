@@ -303,8 +303,7 @@ def guidance_setup_enhanced(guidance_opt):
     增强版的guidance设置，支持视角特定的触发词
     """
     if guidance_opt.guidance=="SD":
-        from guidance.sd_utils_copy_original3 import StableDiffusion
-        # from guidance.sd_utils_copy_original import StableDiffusion
+        from guidance.sd_utils import StableDiffusion
         guidance = StableDiffusion(guidance_opt.g_device, guidance_opt.fp16, guidance_opt.vram_O, 
                                    guidance_opt.t_range, guidance_opt.max_t_range, 
                                    num_train_timesteps=guidance_opt.num_train_timesteps, 
@@ -326,7 +325,7 @@ def guidance_setup_enhanced(guidance_opt):
 
 def guidance_setup(guidance_opt):
     if guidance_opt.guidance=="SD":
-        from guidance.sd_utils_copy_original3 import StableDiffusion
+        from guidance.sd_utils import StableDiffusion
         guidance = StableDiffusion(guidance_opt.g_device, guidance_opt.fp16, guidance_opt.vram_O, 
                                    guidance_opt.t_range, guidance_opt.max_t_range, 
                                    num_train_timesteps=guidance_opt.num_train_timesteps, 
@@ -436,12 +435,6 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
                 print('scale up phi_range to:', scene.pose_args.phi_range)
                 print('scale up fovy_range to:', scene.pose_args.fovy_range)
 
-        # Pick a random Camera
-        # if not viewpoint_stack and not guidance_opt.fixed_view:
-        #     # viewpoint_stack = scene.getRandTrainCameras().copy()
-        #     viewpoint_stack = scene.getCircleVideoCameras(render45=True).copy()     
-        
-        # # 视点栈选择逻辑
         if not viewpoint_stack and guidance_opt.fixed_view:
             # 前期训练使用标准视角
             if iteration < opt.warmup_iter:  # 在热身阶段前期使用标准视角
@@ -455,10 +448,6 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
             if not viewpoint_stack:
                 viewpoint_stack = scene.getRandTrainCameras().copy()
 
-        # if not viewpoint_stack:
-        #     # viewpoint_stack = scene.getRandomFixedAngleCameras().copy()
-        #     viewpoint_stack = scene.getRandTrainCameras().copy()
-        
         C_batch_size = guidance_opt.C_batch_size
         viewpoint_cams = []
         images = []
@@ -567,13 +556,6 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
                                                 use_control_net = use_control_net ,save_folder = save_folder,  iteration = iteration, warm_up_rate=warm_up_rate, 
                                                 weights = torch.stack(weights_, dim=1), resolution=(gcams.image_h, gcams.image_w),
                                                 guidance_opt=guidance_opt,as_latent=_aslatent, embedding_inverse = text_z_inverse, opt=opt)
-            
-            # loss = guidance.train_step_perpneg(torch.stack(text_z_, dim=1), images, 
-            #                                     pred_depth=depths, pred_alpha=alphas,
-            #                                     grad_scale=guidance_opt.lambda_guidance,
-            #                                     use_control_net = use_control_net ,save_folder = save_folder,  iteration = iteration, warm_up_rate=warm_up_rate, 
-            #                                     weights = torch.stack(weights_, dim=1), resolution=(gcams.image_h, gcams.image_w),
-            #                                     guidance_opt=guidance_opt,as_latent=_aslatent, embedding_inverse = text_z_inverse)
         else:
             loss = guidance.train_step(torch.stack(text_z_, dim=1), images, 
                                     pred_depth=depths, pred_alpha=alphas,
