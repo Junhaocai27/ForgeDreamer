@@ -6,24 +6,24 @@ from torch import nn
 
 def load_dino_model(weights_path):
     """
-    从本地权重文件加载DINO模型
+    Load the DINO model from a local weights file
     
     Args:
-        weights_path: DINO模型权重文件的路径
+        weights_path: path to the DINO model weights file
     
     Returns:
-        加载好的DINO模型
+        the loaded DINO model
     """
-    # 确保权重文件存在
+    # Ensure the weights file exists
     if not os.path.exists(weights_path):
-        raise FileNotFoundError(f"DINO权重文件未找到: {weights_path}")
+        raise FileNotFoundError(f"DINO weights file not found: {weights_path}")
     
-    # 创建DINO ViT-S/8模型结构
+    # Create the DINO ViT-S/8 model architecture
     model = torch.hub.load('facebookresearch/dino:main', 'dino_vits8', pretrained=False)
     
-    # 加载预训练权重
+    # Load pretrained weights
     state_dict = torch.load(weights_path, map_location="cpu")
-    # 有些权重文件可能包含额外的键，如果需要，可以过滤掉
+    # Some weight files may contain extra keys; filter them out if needed
     # state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
     model.load_state_dict(state_dict)
     
@@ -32,24 +32,24 @@ def load_dino_model(weights_path):
 
 def preprocess_tensor(image_tensor):
     """
-    预处理tensor格式的图像以适应DINO模型的输入要求
+    Preprocess an image tensor to match DINO model input requirements
     
     Args:
-        image_tensor: 输入图像tensor，形状为[C, H, W]或[B, C, H, W]
+        image_tensor: input image tensor with shape [C, H, W] or [B, C, H, W]
     
     Returns:
-        预处理后的图像tensor，形状为[B, C, H, W]
+        preprocessed image tensor with shape [B, C, H, W]
     """
-    # 确保输入是4D tensor [B, C, H, W]
+    # Ensure input is a 4D tensor [B, C, H, W]
     if len(image_tensor.shape) == 3:
-        image_tensor = image_tensor.unsqueeze(0)  # 添加batch维度
+        image_tensor = image_tensor.unsqueeze(0)  # add batch dimension
     
-    # 确保尺寸正确
+    # Ensure correct size
     if image_tensor.shape[2] != 224 or image_tensor.shape[3] != 224:
         resize = transforms.Resize((224, 224))
         image_tensor = resize(image_tensor)
     
-    # 归一化图像
+    # Normalize the image
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     image_tensor = normalize(image_tensor)
     
@@ -66,14 +66,14 @@ def preprocess_image(image_path):
 
 def extract_features_from_tensor(image_tensor, model):
     """
-    从tensor格式的图像中提取特征
+    Extract features from an image tensor
     
     Args:
-        image_tensor: 输入图像tensor
-        model: DINO模型
+        image_tensor: input image tensor
+        model: DINO model
     
     Returns:
-        提取的特征
+        extracted features
     """
     processed_tensor = preprocess_tensor(image_tensor)
     with torch.no_grad():
@@ -88,6 +88,6 @@ def extract_features(image_path, model):
 
 # Example usage:
 # model = load_dino_model('/path/to/dino_weights.pth')
-# image_tensor = torch.randn(3, 256, 256)  # 示例tensor图像
+# image_tensor = torch.randn(3, 256, 256)  # example tensor image
 # features = extract_features_from_tensor(image_tensor, model)
 # print(features)

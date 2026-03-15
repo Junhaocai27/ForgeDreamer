@@ -12,15 +12,15 @@ import os
 
 class SubjectMaskGenerator:
     """
-    使用FastSAM进行主体掩码生成的类
+    Class for subject mask generation using FastSAM
     """
     def __init__(self, device, fastsam_checkpoint_path="/root/LucidDreamer/FastSAM/FastSAM.pt"):
         """
-        初始化FastSAM模型
+        Initialize the FastSAM model
         
         Args:
-            device: 计算设备 (cuda/cpu)
-            fastsam_checkpoint_path: FastSAM模型权重路径
+            device: compute device (cuda/cpu)
+            fastsam_checkpoint_path: path to the FastSAM model weights
         """
         self.device = device
         self.fastsam = None
@@ -28,10 +28,10 @@ class SubjectMaskGenerator:
         
         print("[MaskGenerator] Initializing FastSAM...")
         try:
-            # 加载FastSAM模型
+            # Load the FastSAM model
             if os.path.exists(fastsam_checkpoint_path):
                 self.fastsam = FastSAM(fastsam_checkpoint_path)
-                self.mask_generator = self.fastsam  # 保持兼容性
+                self.mask_generator = self.fastsam  # maintain compatibility
                 print(f"[MaskGenerator] FastSAM model loaded successfully from: {fastsam_checkpoint_path}")
             else:
                 print(f"[MaskGenerator] FATAL: FastSAM checkpoint not found at: {fastsam_checkpoint_path}")
@@ -42,14 +42,14 @@ class SubjectMaskGenerator:
     
     # def generate_mask_from_np(self, image_rgb_np, strategy='border', **kwargs):
     #     """
-    #     从NumPy RGB图像数组生成主体二值掩码
+    #     Generate a subject binary mask from a NumPy RGB image array
         
     #     Args:
-    #         image_rgb_np (np.ndarray): RGB图像的NumPy格式，形状 [H, W, 3]，dtype uint8
-    #         strategy (str): 背景识别策略，支持 'border', 'variance', 'largest', 'center'
+    #         image_rgb_np (np.ndarray): NumPy format RGB image, shape [H, W, 3], dtype uint8
+    #         strategy (str): background recognition strategy, supports 'border', 'variance', 'largest', 'center'
             
     #     Returns:
-    #         np.ndarray: 形状为 [H, W] 的布尔掩码，True表示主体，失败时返回None
+    #         np.ndarray: boolean mask of shape [H, W], True indicates subject, None on failure
     #     """
     #     if self.mask_generator is None:
     #         print("[MaskGenerator] ERROR: FastSAM model not available for mask generation.")
@@ -58,10 +58,10 @@ class SubjectMaskGenerator:
     #     print(f"[MaskGenerator] Generating segments for a {image_rgb_np.shape} image using FastSAM...")
         
     #     try:
-    #         # 转换为PIL Image
+    #         # Convert to PIL Image
     #         pil_image = Image.fromarray(image_rgb_np).convert("RGB")
             
-    #         # FastSAM推理
+    #         # FastSAM inference
     #         everything_results = self.fastsam(
     #             pil_image,
     #             device=self.device,
@@ -71,7 +71,7 @@ class SubjectMaskGenerator:
     #             iou=0.9
     #         )
             
-    #         # 创建提示处理器并获取所有分割结果
+    #         # Create prompt processor and get all segmentation results
     #         prompt_process = FastSAMPrompt(pil_image, everything_results, device=self.device)
     #         masks_tensor = prompt_process.everything_prompt()
             
@@ -79,12 +79,12 @@ class SubjectMaskGenerator:
     #             print("[MaskGenerator] WARN: FastSAM did not produce any segments.")
     #             return None
             
-    #         # 转换为numpy格式，并创建类似SAM的mask结构
+    #         # Convert to numpy format and create SAM-like mask structures
     #         masks = []
     #         for i in range(masks_tensor.shape[0]):
     #             mask_np = masks_tensor[i].cpu().numpy().astype(bool)
     #             area = np.sum(mask_np)
-    #             if area > 0:  # 只保留非空掩码
+    #             if area > 0:  # keep non-empty masks only
     #                 masks.append({
     #                     'segmentation': mask_np,
     #                     'area': area,
@@ -125,11 +125,11 @@ class SubjectMaskGenerator:
     #                 print("[MaskGenerator] WARN: No suitable masks for variance strategy. Falling back to largest area mask.")
             
     #         elif strategy == 'largest':
-    #             # 直接选择最大的掩码作为背景
+    #             # Directly select the largest mask as background
     #             background_ann = sorted(masks, key=lambda x: x['area'], reverse=True)[0]
             
     #         elif strategy == 'center':
-    #             # 选择最接近图像中心的掩码
+    #             # Select the mask closest to the image center
     #             h, w = image_rgb_np.shape[:2]
     #             center_y, center_x = h // 2, w // 2
                 
@@ -169,13 +169,13 @@ class SubjectMaskGenerator:
 
     def generate_mask_from_np(self, image_rgb_np, **kwargs):
         """
-        从NumPy RGB图像数组生成主体二值掩码
+        Generate a subject binary mask from a NumPy RGB image array
         
         Args:
-            image_rgb_np (np.ndarray): RGB图像的NumPy格式，形状 [H, W, 3]，dtype uint8
+            image_rgb_np (np.ndarray): NumPy format RGB image, shape [H, W, 3], dtype uint8
             
         Returns:
-            np.ndarray: 形状为 [H, W] 的布尔掩码，True表示主体，失败时返回None
+            np.ndarray: boolean mask of shape [H, W], True indicates subject, None on failure
         """
         if self.mask_generator is None:
             print("[MaskGenerator] ERROR: FastSAM model not available for mask generation.")
@@ -184,10 +184,10 @@ class SubjectMaskGenerator:
         print(f"[MaskGenerator] Generating segments for a {image_rgb_np.shape} image using FastSAM...")
         
         try:
-            # 转换为PIL Image
+            # Convert to PIL Image
             pil_image = Image.fromarray(image_rgb_np).convert("RGB")
             
-            # FastSAM推理
+            # FastSAM inference
             everything_results = self.fastsam(
                 pil_image,
                 device=self.device,
@@ -197,7 +197,7 @@ class SubjectMaskGenerator:
                 iou=0.9
             )
             
-            # 创建提示处理器并获取所有分割结果
+            # Create prompt processor and get all segmentation results
             prompt_process = FastSAMPrompt(pil_image, everything_results, device=self.device)
             masks_tensor = prompt_process.everything_prompt()
             
@@ -207,14 +207,13 @@ class SubjectMaskGenerator:
             
             print(f"[MaskGenerator] FastSAM generated {masks_tensor.shape[0]} segments.")
             
-            # 直接模仿第二个代码的方式：合并所有掩码
-            # 使用逻辑或操作合并所有掩码 (任何一个掩码为True的地方就是主体)
+            # Combine all masks using logical OR (any mask True means subject)
             combined_mask = torch.any(masks_tensor, dim=0)
             
-            # 转换为numpy格式的布尔掩码
+            # Convert to numpy boolean mask
             subject_mask = combined_mask.cpu().numpy().astype(bool)
             
-            # 计算主体区域比例
+            # Calculate subject area ratio
             subject_ratio = subject_mask.sum() / subject_mask.size * 100
             print(f"[MaskGenerator] Mask generated. Subject area: {subject_ratio:.2f}%")
             
@@ -225,12 +224,12 @@ class SubjectMaskGenerator:
             return None
     
     def _touches_border(self, mask):
-        """检查掩码是否接触图像边界"""
+        """Check whether the mask touches the image border"""
         return (mask[0, :].any() or mask[-1, :].any() or 
                 mask[:, 0].any() or mask[:, -1].any())
     
     def _get_bbox(self, mask):
-        """获取掩码的边界框"""
+        """Get the bounding box of the mask"""
         rows, cols = np.where(mask)
         if len(rows) == 0:
             return [0, 0, 0, 0]

@@ -18,11 +18,11 @@ import cv2
 import numpy as np
 import torch
 
-# 强制关闭 PyTorch 原生的 FlashAttention 和 MemEfficientAttention
+# Forcibly disable PyTorch native FlashAttention and MemEfficientAttention
 torch.backends.cuda.enable_flash_sdp(False)
 torch.backends.cuda.enable_mem_efficient_sdp(False)
 
-# 强制开启最原始、最精确的 Math 计算模式 (对应旧环境的隐式回退)
+# Force the most basic, most accurate Math computation mode (implicit fallback in older environments)
 torch.backends.cuda.enable_math_sdp(True)
 
 import torch.nn as nn
@@ -31,7 +31,7 @@ import torchvision.transforms as T
 from torchvision.utils import save_image
 from torch.cuda.amp import custom_bwd, custom_fwd
 from .perpneg_utils import weighted_perpendicular_aggregator
-from torch.utils.tensorboard import SummaryWriter  # 添加TensorBoard导入
+from torch.utils.tensorboard import SummaryWriter  # add TensorBoard import
 from .hypergraph_enhancer import StaticGradientHypergraphEnhancer, ImprovedStaticDHGLatentHypergraph, SimplifiedDHGLatentHypergraph, DirectSimilarityDHGLatentHypergraph
 from .mask_utils import SubjectMaskGenerator
 
@@ -39,134 +39,134 @@ from .sd_step import *
 
 def generate_advanced_mask_hsv(original_image: np.ndarray, verbose: bool = False) -> Union[np.ndarray, None]:
     """
-    修改版：适用于白色背景图像中物体的分割，返回 0/1 二值掩码（无最大连通域筛选）。
+    Modified version: segment objects on white-background images, returns a 0/1 binary mask (no largest-connected-component filtering).
     """
     if verbose:
-        print("--- [generate_advanced_mask_hsv] 使用HSV分割白色背景物体 ---")
+        print("--- [generate_advanced_mask_hsv] Using HSV to segment objects on white background ---")
 
     if original_image.ndim != 3 or original_image.shape[2] != 3:
-        if verbose: print("错误: 输入图像必须是3通道BGR格式。")
+        if verbose: print("Error: input image must be a 3-channel BGR format.")
         return None
 
     height, width = original_image.shape[:2]
 
-    # 转换为 HSV 色彩空间
+    # Convert to HSV color space
     hsv = cv2.cvtColor(original_image, cv2.COLOR_BGR2HSV)
     
-    # 步骤 1: 剔除白色背景（低饱和度 + 高亮度）
+    # Step 1: Remove white background (low saturation + high brightness)
     white_bg_mask = cv2.inRange(hsv, (0, 0, 240), (180, 10, 255))
-    fg_mask = cv2.bitwise_not(white_bg_mask)  # 主体区域 = 非白色区域 (0/255)
+    fg_mask = cv2.bitwise_not(white_bg_mask)  # subject area = non-white region (0/255)
 
     if verbose:
         white_ratio = np.mean(white_bg_mask > 0)
-        print(f"[HSV] 背景白色比例: {white_ratio*100:.2f}%")
+        print(f"[HSV] White background ratio: {white_ratio*100:.2f}%")
 
-    # 步骤 2: 边缘增强（可选）
+    # Step 2: Edge enhancement (optional)
     edges = cv2.Canny(fg_mask, 50, 150)
     dilated_edges = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=1)
     fg_mask = cv2.bitwise_or(fg_mask, dilated_edges)
 
-    # 步骤 3: 形态学处理（噪声去除 + 缝隙填补）
+    # Step 3: Morphological processing (noise removal + gap filling)
     kernel_size = max(3, min(9, int(min(height, width) / 200)))
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
     fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel, iterations=1)
     fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
 
     if verbose:
-        print(f"形态学处理完成，核大小: {kernel_size}")
+        print(f"Morphological processing complete, kernel size: {kernel_size}")
 
-    # 步骤 4: 直接返回处理后的前景掩码（不再使用最大连通域）
+    # Step 4: Directly return the processed foreground mask (no longest connected component)
     final_mask_01 = (fg_mask / 255).astype(np.uint8)
 
-    if verbose: print("生成 0/1 二值掩码完成（未使用连通域筛选）。")
+    if verbose: print("0/1 binary mask generation complete (no connected-component filtering).")
     return final_mask_01
 
 
 def generate_advanced_mask(original_image: np.ndarray, verbose: bool = False) -> Union[np.ndarray, None]:
     """
-    【核心蒙版生成器】从一个numpy数组格式的图像中分割出纯色背景下的物体。
-    该函数不执行任何文件I/O，使其易于在其他代码中重用。
+    [Core Mask Generator] Segment an object on a solid-color background from a NumPy image array.
+    This function performs no file I/O, making it easy to reuse in other code.
 
-    参数:
-    original_image (np.ndarray): 输入的BGR图像数组 (形状为 H, W, 3), dtype=uint8。
-    verbose (bool): 是否打印详细的处理步骤信息。
+    Args:
+    original_image (np.ndarray): Input BGR image array (shape H, W, 3), dtype=uint8.
+    verbose (bool): Whether to print detailed processing step information.
 
-    返回:
+    Returns:
     np.ndarray | None: 
-        - 最终的单通道灰度蒙版 (形状为 H, W), dtype=uint8 (值为 0-255)。
-        - 如果处理失败，则返回 None。
+        - Final single-channel grayscale mask (shape H, W), dtype=uint8 (values 0-255).
+        - None if processing fails.
     """
     if verbose:
-        print("--- [generate_advanced_mask] 开始高级分割 ---")
+        print("--- [generate_advanced_mask] Starting advanced segmentation ---")
     
-    # 确保图像是3通道的
+    # Ensure image has 3 channels
     if original_image.ndim != 3 or original_image.shape[2] != 3:
-        if verbose: print("错误: 输入图像必须是3通道BGR格式。")
+        if verbose: print("Error: input image must be a 3-channel BGR format.")
         return None
 
     height, width = original_image.shape[:2]
 
-    # --- 步骤 2: 多通道分析选择最佳通道 ---
+    # --- Step 2: Multi-channel analysis to select the best channel ---
     b, g, r = cv2.split(original_image)
     channels = [b, g, r]
     channel_names = ['Blue', 'Green', 'Red']
     variances = [np.var(channel) for channel in channels]
     best_channel_idx = np.argmax(variances)
     best_channel = channels[best_channel_idx]
-    if verbose: print(f"选择了{channel_names[best_channel_idx]}通道进行分割（方差: {variances[best_channel_idx]:.2f}）")
+    if verbose: print(f"Selected {channel_names[best_channel_idx]} channel for segmentation (variance: {variances[best_channel_idx]:.2f})")
 
-    # --- 步骤 3: 边缘检测辅助分割 ---
+    # --- Step 3: Edge detection to assist segmentation ---
     median_val = np.median(best_channel)
     lower_thresh = max(0, int(0.5 * median_val))
     upper_thresh = min(255, int(1.5 * median_val))
     edges = cv2.Canny(best_channel, lower_thresh, upper_thresh)
-    if verbose: print(f"边缘检测阈值: {lower_thresh}-{upper_thresh}")
+    if verbose: print(f"Edge detection thresholds: {lower_thresh}-{upper_thresh}")
 
-    # --- 步骤 4: 改进的Otsu二值化 ---
+    # --- Step 4: Improved Otsu binarization ---
     blurred = cv2.GaussianBlur(best_channel, (5, 5), 0)
     _, otsu_mask = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     
-    # --- 步骤 5: 结合边缘信息改进蒙版 ---
+    # --- Step 5: Combine edge information to improve mask ---
     dilated_edges = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=1)
     combined_mask = cv2.bitwise_or(otsu_mask, dilated_edges)
     
-    # --- 步骤 6: 智能形态学处理 ---
+    # --- Step 6: Intelligent morphological processing ---
     kernel_size = max(3, min(9, int(min(height, width) / 200)))
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
     cleaned_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, kernel, iterations=1)
     cleaned_mask = cv2.morphologyEx(cleaned_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-    if verbose: print(f"使用{kernel_size}x{kernel_size}椭圆核进行形态学处理...")
+    if verbose: print(f"Morphological processing with {kernel_size}x{kernel_size} elliptical kernel...")
 
-    # --- 步骤 7: 连通域分析保留最大区域 ---
+    # --- Step 7: Connected-component analysis to keep the largest region ---
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(cleaned_mask, connectivity=8)
     if num_labels <= 1:
-        if verbose: print("未发现有效的连通域，可能分割失败。")
-        # 如果没有找到物体，返回一个全黑的蒙版或者当前处理结果
+        if verbose: print("No valid connected components found; segmentation may have failed.")
+        # If no object found, return an all-black mask or the current result
         return cleaned_mask
         
     largest_component = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
     final_mask = np.zeros_like(cleaned_mask)
     final_mask[labels == largest_component] = 255
-    if verbose: print(f"保留最大连通域，面积: {stats[largest_component, cv2.CC_STAT_AREA]} 像素")
+    if verbose: print(f"Keeping largest connected component, area: {stats[largest_component, cv2.CC_STAT_AREA]} pixels")
 
-    # --- 步骤 8 & 10 (合并): 边界优化和平滑 ---
+    # --- Steps 8 & 10 (merged): Boundary refinement and smoothing ---
     contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        if verbose: print("最终蒙版中未找到轮廓。")
-        return final_mask # 返回之前的蒙版
+        if verbose: print("No contours found in final mask.")
+        return final_mask  # return previous mask
 
     largest_contour = max(contours, key=cv2.contourArea)
     refined_mask = np.zeros_like(final_mask)
     cv2.drawContours(refined_mask, [largest_contour], -1, 255, thickness=cv2.FILLED)
     
-    # 轻微膨胀以确保边缘完整性，然后模糊以平滑边缘
-    kernel_dilate = np.ones((3, 3), np.uint8) # 使用较小的核进行膨胀
+    # Slight dilation to ensure edge completeness, then blur to smooth edges
+    kernel_dilate = np.ones((3, 3), np.uint8)  # use a smaller kernel for dilation
     refined_mask = cv2.dilate(refined_mask, kernel_dilate, iterations=1)
-    refined_mask = cv2.GaussianBlur(refined_mask, (5, 5), 0) # 最终的平滑处理
+    refined_mask = cv2.GaussianBlur(refined_mask, (5, 5), 0)  # final smoothing
     
-    if verbose: print("已优化并平滑物体边界...")
+    if verbose: print("Object boundary refined and smoothed...")
     
-    # 返回最终的、高质量的单通道蒙版 (主体为白色 255, 背景为黑色 0)
+    # Return the final high-quality single-channel mask (subject=white 255, background=black 0)
     return refined_mask
 
 def rgb2sat(img, T=None):
@@ -209,20 +209,20 @@ class StableDiffusion(nn.Module):
         self.device = device
         self.precision_t = torch.float16 if fp16 else torch.float32
 
-        # ====================  在这里添加超图模块初始化 ====================
-        self.use_hypergraph = getattr(guidance_opt, 'use_hypergraph', False)  # 默认使用超图增强
+        # ====================  Hypergraph module initialization  ====================
+        self.use_hypergraph = getattr(guidance_opt, 'use_hypergraph', False)  # default: use hypergraph enhancement
         if self.use_hypergraph:
             self.hypergraph_enhancer = StaticGradientHypergraphEnhancer(
                 patch_size=getattr(guidance_opt, 'hg_patch_size', 4),
                 alpha=getattr(guidance_opt, 'hg_alpha', 0.6),
                 similarity_threshold=getattr(guidance_opt, 'hg_sim_thresh', 0.8),
-                device=self.device # 传递设备信息
+                device=self.device  # pass device info
             )
         else:
             self.hypergraph_enhancer = None
         # ===================================================================
 
-        # ====================  新增DHG Latent超图模块初始化 ====================
+        # ====================  DHG Latent Hypergraph module initialization  ====================
         self.use_dhg_latent_hypergraph = getattr(guidance_opt, 'use_dhg_latent_hypergraph', True)
         if self.use_dhg_latent_hypergraph:
             
@@ -247,20 +247,20 @@ class StableDiffusion(nn.Module):
 
         print(f'[INFO] loading stable diffusion...')
 
-        # 添加课程学习参数
+        # Add curriculum learning parameters
         self.curriculum_schedule = getattr(guidance_opt, 'curriculum_schedule', 'linear')
         self.curriculum_phases = getattr(guidance_opt, 'curriculum_phases', ['coarse', 'medium', 'fine'])
         self.phase_transitions = getattr(guidance_opt, 'phase_transitions', [1500, 2500, 5000])
         
-        # 时间步范围定义
+        # Timestep range definitions
         self.timestep_ranges = {
-            'coarse': [0.7, 0.98],     # 高噪声，学习粗粒度结构
-            'medium': [0.3, 0.8],      # 中等噪声，学习中等细节
-            'fine': [0.02, 0.5],       # 低噪声，学习精细细节
-            'adaptive': [0.02, 0.98]   # 自适应范围
+            'coarse': [0.7, 0.98],     # high noise, learn coarse structure
+            'medium': [0.3, 0.8],      # medium noise, learn medium detail
+            'fine': [0.02, 0.5],       # low noise, learn fine detail
+            'adaptive': [0.02, 0.98]   # adaptive range
         }
 
-        # 添加TensorBoard writer
+        # Add TensorBoard writer
         self.writer = SummaryWriter(log_dir=guidance_opt.tensorboard_log_dir if hasattr(guidance_opt, 'tensorboard_log_dir') else './runs/sd_training_new')
 
         model_key = guidance_opt.model_key
@@ -314,7 +314,7 @@ class StableDiffusion(nn.Module):
         self.text_encoder = pipe.text_encoder
         self.unet = pipe.unet
 
-        # --- 新增以下代码，强制回退到基础 Attention 处理器 ---
+        # --- Force fallback to the base Attention processor ---
         from diffusers.models.attention_processor import AttnProcessor
         self.unet.set_attn_processor(AttnProcessor())
         
@@ -342,28 +342,28 @@ class StableDiffusion(nn.Module):
 
         print(f'[INFO] loaded stable diffusion!')
 
-        # ==================== 蒙版设置 (修改后) ====================
+        # ==================== Mask setup (updated) ====================
         self.use_subject_mask = use_subject_mask
         self.mask_strategy = mask_strategy
         self.mask_on_subject = mask_on_subject
-        # self.subject_mask_generator = None  # 这个生成器对象不再需要
+        # self.subject_mask_generator = None  # this generator object is no longer needed
         self.mask_cache = {}
 
         if self.use_subject_mask:
-            # 现在我们默认使用 'advanced' 策略，无需在此处加载复杂的模型
+            # We now default to the 'advanced' strategy; no need to load complex models here
             H = getattr(guidance_opt, 'H', 512)
             W = getattr(guidance_opt, 'W', 512)
             self.latent_height = H // 8
             self.latent_width = W // 8
-            print(f"[SD Init] 蒙版功能已启用，策略: '{self.mask_strategy}'。")
-            print(f"[SD Init] 用于蒙版的Latent空间尺寸: ({self.latent_height}, {self.latent_width}).")
-            print(f"[SD Init] 在主体上应用蒙版: {self.mask_on_subject}。")
+            print(f"[SD Init] Mask feature enabled, strategy: '{self.mask_strategy}'.")
+            print(f"[SD Init] Latent space size for mask: ({self.latent_height}, {self.latent_width}).")
+            print(f"[SD Init] Apply mask on subject: {self.mask_on_subject}.")
         else:
-            print("[SD Init] 蒙版功能已禁用。")
+            print("[SD Init] Mask feature disabled.")
 
         print("[INFO] Initializing Three-Phase Annealing Curriculum for timesteps and guidance.")
         
-        # --- 新的课程学习参数 ---
+        # --- New curriculum learning parameters ---
         self.total_iterations = getattr(guidance_opt, 'total_iterations', 5000)
         
         transitions_percent = getattr(guidance_opt, 'phase_transitions', [0.2, 0.6])
@@ -381,7 +381,7 @@ class StableDiffusion(nn.Module):
             'fine':   getattr(guidance_opt, 'guidance_scale_fine', [50, 20]),
         }
         
-        # (可选) 损失权重
+        # (Optional) loss weights
         self.loss_weights = {
             'coarse': getattr(guidance_opt, 'loss_weight_coarse', [1.0, 1.0]),
             'refine': getattr(guidance_opt, 'loss_weight_refine', [1.0, 0.8]),
@@ -390,26 +390,26 @@ class StableDiffusion(nn.Module):
 
     def get_biased_time_step(self, warm_up_rate):
         """
-        根据训练进度 warm_up_rate 使用非均匀分布从时间步中采样 ind_t。
-        高噪声时间步比例会随着 warm_up_rate 逐步增加。
+        Sample ind_t from a non-uniform distribution based on training progress warm_up_rate.
+        The proportion of high-noise timesteps increases gradually with warm_up_rate.
         """
 
-        # 时间步范围
+        # Timestep range
         min_step = self.min_step
         max_step = self.max_step + int(self.warmup_step * warm_up_rate)
         total_steps = max_step - min_step + 1
 
-        # 随着 warm_up_rate 引入更多高噪声比例（最多40%）
+        # Introduce more high-noise proportion as warm_up_rate increases (up to 40%)
         high_ratio = min(0.1 + 0.3 * warm_up_rate, 0.4)
         low_ratio = 0.3
         mid_ratio = 1.0 - low_ratio - high_ratio
 
-        # 各区间的范围
+        # Range for each interval
         low_range = (min_step, min_step + int(total_steps * low_ratio))
         mid_range = (low_range[1], low_range[1] + int(total_steps * mid_ratio))
         high_range = (mid_range[1], max_step + 1)
 
-        # 根据比例进行采样
+        # Sample based on ratios
         rand_val = torch.rand(1).item()
         if rand_val < low_ratio:
             chosen_range = low_range
@@ -418,7 +418,7 @@ class StableDiffusion(nn.Module):
         else:
             chosen_range = high_range
 
-        # 最终随机选出一个时间步
+        # Finally, randomly pick one timestep
         ind_t = torch.randint(
             chosen_range[0], chosen_range[1],
             (1,), dtype=torch.long,
@@ -428,12 +428,12 @@ class StableDiffusion(nn.Module):
 
         return ind_t
     
-    # <<< 新增的辅助函数 >>>
+    # <<< New helper function >>>
     def get_annealed_params(self, iteration):
         """
-        根据当前迭代步数，计算退火后的时间步范围和指导强度。
+        Compute the annealed timestep range and guidance strength based on the current iteration.
         """
-        # 1. 确定当前阶段
+        # 1. Determine current phase
         if iteration < self.phase_transitions_iter[0]:
             phase = 'coarse'
             phase_start_iter = 0
@@ -447,34 +447,34 @@ class StableDiffusion(nn.Module):
             phase_start_iter = self.phase_transitions_iter[1]
             phase_end_iter = self.total_iterations
 
-        # 2. 计算在当前阶段的进度 (0.0 to 1.0)
-        # 防止除以零
+        # 2. Compute progress within the current phase (0.0 to 1.0)
+        # Prevent division by zero
         if phase_end_iter == phase_start_iter:
             progress = 1.0
         else:
             progress = (iteration - phase_start_iter) / (phase_end_iter - phase_start_iter)
 
-        # 3. 线性插值 (lerp) 计算当前参数
+        # 3. Linear interpolation (lerp) to compute current parameters
         def lerp(start, end, progress):
             return start + progress * (end - start)
 
-        # 获取当前阶段的参数范围
+        # Get the parameter range for the current phase
         t_range_start, t_range_end = self.t_ranges[phase]
         guidance_start, guidance_end = self.guidance_scales[phase]
         loss_weight_start, loss_weight_end = self.loss_weights[phase]
 
-        # 计算当前值
-        # 注意：对于 t_range，我们通常保持其在阶段内固定，而不是插值。
-        # 如果需要，也可以对 t_range 进行退火，但从固定范围开始更简单。
+        # Compute current values
+        # Note: for t_range we typically keep it fixed within the phase rather than interpolating.
+        # Annealing t_range is also possible, but starting from a fixed range is simpler.
         current_t_range = [t_range_start, t_range_end]
         current_guidance_scale = lerp(guidance_start, guidance_end, progress)
         current_loss_weight = lerp(loss_weight_start, loss_weight_end, progress)
 
-        # 4. 根据 t_range 采样一个时间步
+        # 4. Sample a timestep from t_range
         min_step = int(self.num_train_timesteps * current_t_range[0])
         max_step = int(self.num_train_timesteps * current_t_range[1])
         
-        # 确保 min_step 和 max_step 有效
+        # Ensure min_step and max_step are valid
         max_step = max(min_step + 1, max_step)
         
         ind_t = torch.randint(min_step, max_step, (1,), dtype=torch.long, device=self.device)[0]
@@ -484,63 +484,63 @@ class StableDiffusion(nn.Module):
 
     def _get_or_generate_latent_mask(self, image_tensor, image_index=None, **mask_kwargs):
         """
-        内部辅助方法：根据输入的图像张量，生成并返回一个latent空间的掩码。
-        *** 此方法已被修改，以使用我们新的高级分割器 ***
+        Internal helper method: generate and return a latent-space mask from the input image tensor.
+        *** This method has been modified to use our new advanced segmenter ***
         
-        参数:
-            image_tensor (torch.Tensor): 输入图像张量，形状为 [C, H, W]，数值范围 [0, 1]。
-            image_index (int, optional): 图像索引 (用于缓存，此处未使用)。
-            **mask_kwargs: 不再被新方法使用，但保留以兼容API。
+        Args:
+            image_tensor (torch.Tensor): Input image tensor, shape [C, H, W], values in [0, 1].
+            image_index (int, optional): Image index (used for caching; unused here).
+            **mask_kwargs: No longer used by the new method, but retained for API compatibility.
         """
-        # 动态计算目标 latent 尺寸
+        # Dynamically compute the target latent size
         target_height, target_width = image_tensor.shape[1], image_tensor.shape[2]
         latent_height = target_height // 8
         latent_width = target_width // 8
 
-        # print(f"[蒙版生成] 使用 '{self.mask_strategy}' 策略生成新蒙版...")
+        # print(f"[Mask gen] Generating new mask with '{self.mask_strategy}' strategy...")
         
-        # 1. 转换Tensor为OpenCV兼容的NumPy数组
+        # 1. Convert tensor to an OpenCV-compatible NumPy array
         # PyTorch Tensor: [C, H, W], RGB, 0-1
         # OpenCV aumPy:   [H, W, C], BGR, 0-255
         image_np_rgb = (image_tensor.permute(1, 2, 0).detach().cpu().numpy() * 255).astype(np.uint8)
-        # 将RGB转换为BGR，因为我们的函数基于OpenCV
+        # Convert RGB to BGR because our function is based on OpenCV
         image_np_bgr = cv2.cvtColor(image_np_rgb, cv2.COLOR_RGB2BGR)
 
-        # 2. <<< 核心替换点 >>>
-        #    调用我们新的高级蒙版生成器，而不是FastSAM。
-        full_res_mask_np = generate_advanced_mask_hsv(image_np_bgr, verbose=False) # 在集成时通常关闭详细输出
+        # 2. <<< Core replacement point >>>
+        #    Call our new advanced mask generator instead of FastSAM.
+        full_res_mask_np = generate_advanced_mask_hsv(image_np_bgr, verbose=False)  # verbose usually off during integration
         
-        # 3. 处理蒙版生成失败的情况
+        # 3. Handle mask generation failure
         if full_res_mask_np is None:
-            # print(f"[蒙版生成] 警告: 高级蒙版生成失败。将使用全通(全为1)的蒙版。")
+            # print(f"[Mask gen] Warning: advanced mask generation failed. Using all-ones mask.")
             latent_mask = torch.ones((1, 1, latent_height, latent_width), device=self.device, dtype=self.precision_t)
             return latent_mask
 
-        # 4. 将蒙版转换回Tensor，并降采样到正确的latent尺寸
-        # full_res_mask_np 是单通道 (H, W)，需要添加批次和通道维度 -> (1, 1, H, W)
+        # 4. Convert mask back to tensor and downsample to the correct latent size
+        # full_res_mask_np is single-channel (H, W); add batch and channel dims -> (1, 1, H, W)
         mask_tensor = torch.from_numpy(full_res_mask_np).to(self.device).float().unsqueeze(0).unsqueeze(0) / 255.0
-        # 使用双线性插值降采样到latent空间尺寸
+        # Downsample to latent space size using bilinear interpolation
         latent_mask = F.interpolate(mask_tensor, size=(latent_height, latent_width), mode='bilinear', align_corners=False)
 
-        # 5. 处理蒙版反转逻辑 (例如，如果你想对背景应用guidance)
+        # 5. Handle mask inversion logic (e.g., if you want to apply guidance on background)
         if not self.mask_on_subject:
             latent_mask = 1.0 - latent_mask
 
-        # 6. 返回最终的latent mask
+        # 6. Return the final latent mask
         return latent_mask.to(self.precision_t)
         
 
     def get_curriculum_timestep(self, iteration, warm_up_rate=0):
         """
-        根据训练阶段返回合适的时间步
+        Return an appropriate timestep based on the training phase
         """
         current_phase = self.get_current_phase(iteration)
         
         if current_phase == 'adaptive':
-            # 自适应时间步选择
+            # Adaptive timestep selection
             return self.get_adaptive_timestep(iteration, warm_up_rate)
         else:
-            # 固定阶段时间步
+            # Fixed-phase timestep
             t_range = self.timestep_ranges[current_phase]
             min_step = int(self.num_train_timesteps * t_range[0])
             max_step = int(self.num_train_timesteps * t_range[1])
@@ -550,7 +550,7 @@ class StableDiffusion(nn.Module):
             return ind_t
     
     def get_current_phase(self, iteration):
-        """确定当前训练阶段"""
+        """Determine the current training phase"""
         for i, transition in enumerate(self.phase_transitions):
             if iteration < transition:
                 return self.curriculum_phases[i]
@@ -558,45 +558,45 @@ class StableDiffusion(nn.Module):
     
     def get_adaptive_timestep(self, iteration, warm_up_rate):
         """
-        自适应时间步选择 - 基于训练进度和梯度历史
+        Adaptive timestep selection - based on training progress and gradient history
         """
-        # 基础进度调度
-        progress = min(iteration / 5000, 1.0)  # 假设3000步为完整训练
+        # Base progress schedule
+        progress = min(iteration / 5000, 1.0)  # assume 5000 steps for full training
         
-        # 动态调整时间步范围
+        # Dynamically adjust timestep range
         if progress < 0.3:
-            # 早期：重点学习粗粒度结构
+            # Early stage: focus on learning coarse structure
             t_min, t_max = 0.6, 0.98
-            weight_high = 0.8  # 更多高噪声时间步
+            weight_high = 0.8  # more high-noise timesteps
         elif progress < 0.7:
-            # 中期：平衡学习
+            # Mid stage: balanced learning
             t_min, t_max = 0.2, 0.9
             weight_high = 0.5
         else:
-            # 后期：重点学习细节
+            # Late stage: focus on learning fine details
             t_min, t_max = 0.02, 0.6
-            weight_high = 0.2  # 更多低噪声时间步
+            weight_high = 0.2  # more low-noise timesteps
         
-        # 基于梯度历史调整
+        # Adjust based on gradient history
         if hasattr(self, 'grad_history') and len(self.grad_history) > 10:
             recent_grad_volatility = np.std(self.grad_history[-10:])
-            if recent_grad_volatility > 0.1:  # 梯度不稳定
-                # 使用更高的噪声水平来稳定训练
+            if recent_grad_volatility > 0.1:  # gradient unstable
+                # Use higher noise level to stabilize training
                 t_min = max(t_min, 0.4)
                 weight_high = min(weight_high + 0.2, 0.9)
         
-        # 采样时间步
+        # Sample timestep
         min_step = int(self.num_train_timesteps * t_min)
         max_step = int(self.num_train_timesteps * t_max)
         
-        # 加权采样：根据weight_high调整分布
+        # Weighted sampling: adjust distribution based on weight_high
         if torch.rand(1) < weight_high:
-            # 采样高噪声时间步
+            # Sample high-noise timestep
             high_min = int((min_step + max_step) * 0.6)
             ind_t = torch.randint(high_min, max_step + 1, (1,), 
                                 dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
         else:
-            # 采样低噪声时间步
+            # Sample low-noise timestep
             low_max = int((min_step + max_step) * 0.4)
             ind_t = torch.randint(min_step, low_max + 1, (1,), 
                                 dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
@@ -685,7 +685,7 @@ class StableDiffusion(nn.Module):
         return embeddings
 
     def train_step_perpneg(self, text_embeddings, pred_rgb, pred_depth=None, pred_alpha=None,
-                           image_indices=None, # <--- 接收批量的图像索引
+                           image_indices=None,  # <--- receive batch image indices
                            grad_scale=1, use_control_net=False,
                            save_folder:Path=None, iteration=0, warm_up_rate=0, weights=0,
                            resolution=(512, 512), guidance_opt=None, as_latent=False, embedding_inverse=None, opt=None):
@@ -717,19 +717,19 @@ class StableDiffusion(nn.Module):
 
         if self.use_dhg_latent_hypergraph and self.dhg_latent_hypergraph is not None:
             if iteration < opt.warmup_iter:
-                # 阶段一：warmup期间，在[min_step, max_step + warmup部分]之间随机采样
+                # Phase 1: during warmup, randomly sample in [min_step, max_step + warmup portion]
                 upper_bound = self.max_step + int(self.warmup_step * warm_up_rate)
                 ind_t = torch.randint(self.min_step, upper_bound + 1, (1,), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
             else:
-                # 阶段二：线性递减最大采样步数范围，在[min_step, 当前最大值]之间随机采样
+                # Phase 2: linearly decrease max sample range, randomly sample in [min_step, current max]
                 decay_iter = iteration - opt.warmup_iter
                 decay_total = opt.iterations - opt.warmup_iter
 
-                # 计算当前最大值（线性递减）
+                # Compute current max value (linear decay)
                 current_max_step = int(self.min_step + (1.0 - decay_iter / decay_total) * (self.max_step - self.min_step))
                 current_max_step = max(self.min_step, current_max_step)
 
-                # 在[min_step, 当前最大值]之间随机采样
+                # Randomly sample in [min_step, current max]
                 ind_t = torch.randint(self.min_step, current_max_step + 1, (1,), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
         else:
             ind_t = torch.randint(self.min_step, self.max_step + int(self.warmup_step*warm_up_rate), (1, ), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
@@ -798,19 +798,19 @@ class StableDiffusion(nn.Module):
         # if self.use_subject_mask and self.subject_mask_generator is not None:
         if self.use_subject_mask is not None:
 
-            # =================== 1. 为 pred_rgb (batch_size=4) 生成掩码 ===================
-            # 既然总是重新生成，就不再需要 image_indices 和缓存逻辑了
+            # =================== 1. Generate mask for pred_rgb (batch_size=4) ===================
+            # Since we always regenerate, image_indices and caching logic are no longer needed
             mask_list_input = []
             # print("[Masking] Generating masks for input images (pred_rgb)...")
             for i in range(pred_rgb.shape[0]):
-                # 直接调用生成，不传递 image_index
+                # Generate directly without passing image_index
                 mask = self._get_or_generate_latent_mask(pred_rgb[i], image_index=None)
                 mask_list_input.append(mask)
             latent_mask_input = torch.cat(mask_list_input, dim=0)
 
 
-            # =================== 2. 为 pred_x0_pos (batch_size=4) 生成掩码 ===================
-            # 这部分逻辑保持不变，因为它本来就是实时生成的
+            # =================== 2. Generate mask for pred_x0_pos (batch_size=4) ===================
+            # This part of the logic remains unchanged as it was already generated in real time
             with torch.no_grad():
                 noise_pred_post = noise_pred_uncond + guidance_opt.guidance_scale * delta_DSD    
                 pred_x0_latent_pos = pred_original(self.scheduler, noise_pred_post, prev_t, prev_latents_noisy) 
@@ -828,26 +828,26 @@ class StableDiffusion(nn.Module):
 
         grad = w(self.alphas[t]) * (pred_noise - target)
 
-        # 在这里打印grad的形状
+        # Print the shape of grad here
         # print(f"[DEBUG] grad.shape: {grad.shape}")
         # print(f"[DEBUG] grad.dtype: {grad.dtype}")
         # print(f"[DEBUG] grad.device: {grad.device}")
         # print(f"[DEBUG] grad requires_grad: {grad.requires_grad}")
 
-        # ==================== 在这里应用超图增强 ====================
+        # ==================== Apply hypergraph enhancement here ====================
         if self.use_hypergraph and self.hypergraph_enhancer is not None:
-            original_grad = grad.clone() # 保存原始梯度用于监控
+            original_grad = grad.clone()  # save original gradient for monitoring
             
-            # 直接调用，无需担心反向传播
+            # Call directly, no need to worry about backpropagation
             grad = self.hypergraph_enhancer(grad) 
             
-            # 监控
+            # Monitoring
             with torch.no_grad():
                 original_grad_norm = torch.norm(original_grad).item()
                 enhanced_grad_norm = torch.norm(grad).item()
                 self.writer.add_scalar('Hypergraph/Enhancement_Ratio', enhanced_grad_norm / (original_grad_norm + 1e-9), iteration)
                 
-                # 可视化原始梯度和增强后梯度的差异
+                # Visualize the difference between original and enhanced gradients
                 if iteration % (guidance_opt.vis_interval * 5) == 0:
                     grad_diff = torch.abs(grad - original_grad).mean(dim=1, keepdim=True)
                     grad_diff_vis = F.interpolate(grad_diff, size=(512, 512), mode='bilinear')
@@ -855,17 +855,17 @@ class StableDiffusion(nn.Module):
                     self.writer.add_images('Hypergraph/Grad_Difference', grad_diff_vis.repeat(1, 3, 1, 1), iteration)
         # ==========================================================
 
-        # ==================== 应用DHG Latent超图增强 ====================
+        # ==================== Apply DHG Latent Hypergraph enhancement ====================
         dhg_latent_loss = 0
         if self.use_dhg_latent_hypergraph and self.dhg_latent_hypergraph is not None:
             # print(f"[DEBUG] Applying DHG latent hypergraph enhancement...")
             
             try:
-                # 使用改进的DHG latent超图处理器（传入iteration用于重构判断）
+                # Use the improved DHG latent hypergraph processor (pass iteration for reconstruction decision)
                 grad_enhancement, dhg_latent_loss = self.dhg_latent_hypergraph(
-                    latents,          # 原始latents [B, 4, 64, 64]
-                    (prev_latents_noisy-pred_noise),    # 加噪latents [B, 4, 64, 64]
-                    iteration,        # 当前迭代数，用于判断是否重构\
+                    latents,          # original latents [B, 4, 64, 64]
+                    (prev_latents_noisy-pred_noise),    # noisy latents [B, 4, 64, 64]
+                    iteration,        # current iteration, used to decide whether to reconstruct\
                     mask1=latent_mask_pred,
                     mask2=latent_mask_input,
                 )
@@ -873,33 +873,33 @@ class StableDiffusion(nn.Module):
                 # print(f"[DEBUG] DHG Latent grad_enhancement.shape: {grad_enhancement.shape}")
                 # print(f"[DEBUG] DHG Latent loss: {dhg_latent_loss.item()}")
                 
-                # ==================== 梯度平衡与融合 ====================
+                # ==================== Gradient balancing and fusion ====================
                 with torch.no_grad():
-                    # 1. 计算两个梯度的L2范数（幅度）
+                    # 1. Compute L2 norm (magnitude) of both gradients
                     original_grad_norm = torch.norm(grad)
                     enhancement_norm = torch.norm(grad_enhancement)
                     
-                    # 2. 计算缩放因子，使增强梯度的范数与原始梯度的范数对齐
-                    # 添加一个小的epsilon防止除以零
+                    # 2. Compute scale factor to align enhanced gradient norm with original gradient norm
+                    # Add a small epsilon to prevent division by zero
                     scale_factor = original_grad_norm / (enhancement_norm + 1e-8)
                     
-                    # 获取超参数权重
-                    dhg_enhancement_weight = getattr(guidance_opt, 'dhg_latent_weight', 0.3) # 建议默认值设小一点
+                    # Get hyperparameter weight
+                    dhg_enhancement_weight = getattr(guidance_opt, 'dhg_latent_weight', 0.3)  # recommend a small default
 
-                # 3. 应用缩放和加权
-                # 现在的 dhg_enhancement_weight 控制了“增强梯度”相对于“原始梯度”的强度比例
-                # 例如, weight=0.1 意味着增强梯度的贡献强度是原始梯度的10%
+                # 3. Apply scaling and weighting
+                # dhg_enhancement_weight controls the strength ratio of the enhanced gradient relative to the original
+                # e.g., weight=0.1 means the enhanced gradient contributes 10% of the original gradient's strength
                 scaled_enhancement = grad_enhancement * scale_factor * dhg_enhancement_weight
 
-                original_grad = grad.clone() # 用于监控
+                original_grad = grad.clone()  # for monitoring
                 grad = grad + scaled_enhancement
                 
-                # 固定权重融合
+                # Fixed-weight fusion
                 # dhg_enhancement_weight = getattr(guidance_opt, 'dhg_latent_weight', 0.5)
                 # original_grad = grad.clone()
                 # grad = grad + dhg_enhancement_weight * grad_enhancement
                 
-                # 记录监控信息
+                # Record monitoring information
                 with torch.no_grad():
                     enhancement_norm = torch.norm(scaled_enhancement).item()
                     original_norm = torch.norm(original_grad).item()
@@ -911,32 +911,32 @@ class StableDiffusion(nn.Module):
                     self.writer.add_scalar('DHG_Latent/Loss', dhg_latent_loss.item(), iteration)
                     self.writer.add_scalar('DHG_Latent/EnhancementWeight', dhg_enhancement_weight, iteration)
                     
-                    # 记录超图重构信息
+                    # Record hypergraph reconstruction information
                     if hasattr(self.dhg_latent_hypergraph, 'last_reconstruction_iter'):
                         steps_since_reconstruction = iteration - self.dhg_latent_hypergraph.last_reconstruction_iter
                         self.writer.add_scalar('DHG_Latent/StepsSinceReconstruction', steps_since_reconstruction, iteration)
                     
-                    # 计算增强效果统计
+                    # Compute enhancement effect statistics
                     enhancement_ratio = enhanced_norm / (original_norm + 1e-9)
                     self.writer.add_scalar('DHG_Latent/EnhancementRatio', enhancement_ratio, iteration)
                     
-                    # 可视化增强效果
+                    # Visualize enhancement effect
                     if iteration % 100 == 0:
-                        # 增强可视化
+                        # Enhancement visualization
                         enhancement_vis = scaled_enhancement.abs().mean(dim=1, keepdim=True)
                         enhancement_vis = F.interpolate(enhancement_vis, size=(512, 512), mode='bilinear')
                         enhancement_vis = enhancement_vis / (enhancement_vis.max() + 1e-8)
                         self.writer.add_images('DHG_Latent/Enhancement_Visualization', 
                                             enhancement_vis.repeat(1, 3, 1, 1), iteration)
                         
-                        # 梯度差异可视化
+                        # Gradient difference visualization
                         grad_diff = torch.abs(grad - original_grad).mean(dim=1, keepdim=True)
                         grad_diff_vis = F.interpolate(grad_diff, size=(512, 512), mode='bilinear')
                         grad_diff_vis = grad_diff_vis / (grad_diff_vis.max() + 1e-8)
                         self.writer.add_images('DHG_Latent/Grad_Difference', 
                                             grad_diff_vis.repeat(1, 3, 1, 1), iteration)
                         
-                        # 原始和增强后的梯度对比
+                        # Comparison of original and enhanced gradients
                         original_grad_vis = original_grad.abs().mean(dim=1, keepdim=True)
                         original_grad_vis = F.interpolate(original_grad_vis, size=(512, 512), mode='bilinear')
                         original_grad_vis = original_grad_vis / (original_grad_vis.max() + 1e-8)
@@ -955,9 +955,9 @@ class StableDiffusion(nn.Module):
                 traceback.print_exc()
                 dhg_latent_loss = 0
 
-        # 更全面的梯度监控策略
+        # More comprehensive gradient monitoring strategy
         with torch.no_grad():
-            # === 基础统计信息 ===
+            # === Basic statistics ===
             grad_norm = torch.norm(grad).item()
             grad_mean = torch.mean(grad).item()
             grad_std = torch.std(grad).item()
@@ -965,8 +965,8 @@ class StableDiffusion(nn.Module):
             grad_min = torch.min(grad).item()
             grad_abs_mean = torch.mean(torch.abs(grad)).item()
             
-            # === 通道级别分析 ===
-            for i in range(grad.shape[1]):  # 4个潜在通道
+            # === Channel-level analysis ===
+            for i in range(grad.shape[1]):  # 4 latent channels
                 channel_grad = grad[:, i, :, :]
                 channel_norm = torch.norm(channel_grad).item()
                 channel_mean = torch.mean(channel_grad).item()
@@ -976,8 +976,8 @@ class StableDiffusion(nn.Module):
                 self.writer.add_scalar(f'Gradient/Channel_{i}_Mean', channel_mean, iteration)
                 self.writer.add_scalar(f'Gradient/Channel_{i}_Std', channel_std, iteration)
             
-            # === 空间分析 ===
-            # 计算不同区域的梯度强度
+            # === Spatial analysis ===
+            # Compute gradient intensity in different regions
             h, w = grad.shape[2], grad.shape[3]
             center_grad = grad[:, :, h//4:3*h//4, w//4:3*w//4]
             edge_grad = grad.clone()
@@ -990,17 +990,17 @@ class StableDiffusion(nn.Module):
             self.writer.add_scalar('Gradient/Edge_Norm', edge_norm, iteration)
             self.writer.add_scalar('Gradient/Center_Edge_Ratio', center_norm / (edge_norm + 1e-8), iteration)
             
-            # === 梯度变化趋势 ===
-            # 保存历史梯度norm用于趋势分析
+            # === Gradient change trend ===
+            # Save historical gradient norm for trend analysis
             if not hasattr(self, 'grad_history'):
                 self.grad_history = []
             self.grad_history.append(grad_norm)
             
-            # 保持最近100步的历史
+            # Keep the most recent 100 steps of history
             if len(self.grad_history) > 100:
                 self.grad_history.pop(0)
             
-            # 计算梯度变化趋势
+            # Compute gradient change trend
             if len(self.grad_history) >= 10:
                 recent_grads = self.grad_history[-10:]
                 grad_trend = (recent_grads[-1] - recent_grads[0]) / 10
@@ -1009,8 +1009,8 @@ class StableDiffusion(nn.Module):
                 self.writer.add_scalar('Gradient/Trend', grad_trend, iteration)
                 self.writer.add_scalar('Gradient/Volatility', grad_volatility, iteration)
             
-            # === 相对于不同基准的分析 ===
-            # 与初始噪声的比较
+            # === Analysis relative to different baselines ===
+            # Comparison with initial noise
             noise_norm = torch.norm(noise).item() if 'noise' in locals() else 0
             pred_noise_norm = torch.norm(pred_noise).item()
             target_norm = torch.norm(target).item()
@@ -1019,8 +1019,8 @@ class StableDiffusion(nn.Module):
             self.writer.add_scalar('Gradient/Grad_vs_PredNoise_Ratio', grad_norm / (pred_noise_norm + 1e-8), iteration)
             self.writer.add_scalar('Gradient/Grad_vs_Target_Ratio', grad_norm / (target_norm + 1e-8), iteration)
             
-            # === 梯度健康度指标 ===
-            # 检测梯度异常
+            # === Gradient health indicators ===
+            # Detect gradient anomalies
             grad_has_nan = torch.isnan(grad).any().item()
             grad_has_inf = torch.isinf(grad).any().item()
             grad_zero_ratio = (grad == 0).float().mean().item()
@@ -1031,8 +1031,8 @@ class StableDiffusion(nn.Module):
             self.writer.add_scalar('Gradient/Zero_Ratio', grad_zero_ratio, iteration)
             self.writer.add_scalar('Gradient/Positive_Ratio', grad_positive_ratio, iteration)
             
-            # === 多尺度分析 ===
-            # 不同尺度的梯度强度
+            # === Multi-scale analysis ===
+            # Gradient intensity at different scales
             grad_pooled_2x2 = F.avg_pool2d(grad.abs(), 2)
             grad_pooled_4x4 = F.avg_pool2d(grad.abs(), 4)
             
@@ -1044,7 +1044,7 @@ class StableDiffusion(nn.Module):
             self.writer.add_scalar('Gradient/Medium_Scale_Norm', medium_scale_norm, iteration)
             self.writer.add_scalar('Gradient/Coarse_Scale_Norm', coarse_scale_norm, iteration)
             
-            # === 基础记录 ===
+            # === Basic logging ===
             self.writer.add_scalar('Gradient/Norm', grad_norm, iteration)
             self.writer.add_scalar('Gradient/Mean', grad_mean, iteration)
             self.writer.add_scalar('Gradient/Std', grad_std, iteration)
@@ -1052,26 +1052,26 @@ class StableDiffusion(nn.Module):
             self.writer.add_scalar('Gradient/Min', grad_min, iteration)
             self.writer.add_scalar('Gradient/AbsMean', grad_abs_mean, iteration)
             
-            # === 分布记录 ===
+            # === Distribution logging ===
             self.writer.add_histogram('Gradient/Distribution', grad.flatten(), iteration)
             
-            # 记录每个通道的分布
+            # Log distribution per channel
             for i in range(grad.shape[1]):
                 self.writer.add_histogram(f'Gradient/Channel_{i}_Distribution', 
                                         grad[:, i, :, :].flatten(), iteration)
             
-            # === 训练相关信息 ===
+            # === Training-related information ===
             self.writer.add_scalar('Training/Timestep', t.item(), iteration)
             self.writer.add_scalar('Training/GuidanceScale', guidance_opt.guidance_scale, iteration)
             self.writer.add_scalar('Training/WarmupRate', warm_up_rate, iteration)
             self.writer.add_scalar('Training/CurrentDeltaT', current_delta_t, iteration)
             
-            # === 定期保存梯度可视化 ===
+            # === Periodically save gradient visualizations ===
             if iteration % (guidance_opt.vis_interval * 5) == 0:
-                # 保存梯度的空间分布图
+                # Save spatial distribution map of gradients
                 grad_vis = grad.abs().mean(dim=1, keepdim=True)  # [B, 1, H, W]
                 grad_vis = F.interpolate(grad_vis, size=(512, 512), mode='bilinear')
-                grad_vis = grad_vis / (grad_vis.max() + 1e-8)  # 归一化
+                grad_vis = grad_vis / (grad_vis.max() + 1e-8)  # normalize
                 
                 self.writer.add_images('Gradient/Spatial_Distribution', 
                                      grad_vis.repeat(1, 3, 1, 1), iteration)

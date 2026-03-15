@@ -80,16 +80,16 @@ class Scene:
     
     # def getRandomFixedAngleCameras(self, scale=1.0, angle_ratio=0.5):
     #     """
-    #     获取随机固定角度相机（只包含正面和45度视角）
+    #     Get random fixed-angle cameras (front and 45-degree views only)
         
     #     Args:
-    #         scale: 分辨率缩放比例，默认为1.0
-    #         angle_ratio: 正面视角和45度视角的比例，默认0.5表示各占一半
+    #         scale: resolution scale, default 1.0
+    #         angle_ratio: ratio of front vs 45-degree views, default 0.5 means equal split
         
     #     Returns:
-    #         随机固定角度的相机列表
+    #         list of cameras at random fixed angles
     #     """
-    #     # 生成随机固定角度相机
+    #     # Generate random fixed-angle cameras
     #     fixed_angle_cameras = GenerateRandomFixedAngleCameras(
     #         self.pose_args, 
     #         self.args.batch, 
@@ -97,7 +97,7 @@ class Scene:
     #         angle_ratio=angle_ratio
     #     )
         
-    #     # 创建相机列表
+    #     # Create camera list
     #     train_cameras = {}
     #     for resolution_scale in self.resolution_scales:
     #         train_cameras[resolution_scale] = cameraList_from_RcamInfos(
@@ -111,9 +111,9 @@ class Scene:
 
     def getRandomFixedAngleCameras(self, scale=1.0, random_ratio=True, min_front_ratio=0.3, max_front_ratio=0.7):
         """
-        获取随机固定角度相机（随机比例分配）
+        Get random fixed-angle cameras (with randomly assigned proportions)
         """
-        # 生成随机固定角度相机
+        # Generate random fixed-angle cameras
         fixed_angle_cameras = GenerateRandomFixedAngleCameras(
             self.pose_args, 
             self.args.batch, 
@@ -123,7 +123,7 @@ class Scene:
             max_front_ratio=max_front_ratio
         )
         
-        # 创建相机列表
+        # Create camera list
         train_cameras = {}
         for resolution_scale in self.resolution_scales:
             train_cameras[resolution_scale] = cameraList_from_RcamInfos(
@@ -155,20 +155,20 @@ class Scene:
     
     def getRotatingBatchCameras(self, current_iter, total_iters=5000, views_per_iter=4, scale=1.0):
         """
-        获取每次迭代的多个环绕相机视角
+        Get multiple surrounding camera views for each iteration
         
         Args:
-            current_iter: 当前迭代次数
-            total_iters: 完成一个360度旋转所需的总迭代次数，默认为5000
-            views_per_iter: 每次迭代生成的视角数量，默认为4
-            scale: 分辨率缩放比例，默认为1.0
+            current_iter: current iteration count
+            total_iters: total iterations needed to complete one 360-degree rotation, default 5000
+            views_per_iter: number of views generated per iteration, default 4
+            scale: resolution scale, default 1.0
         
         Returns:
-            当前迭代的多个相机列表
+            list of cameras for the current iteration
         """
         from scene.dataset_readers import GenerateRotatingBatchCameras
         
-        # 生成当前迭代的多个环绕相机视角
+        # Generate multiple surrounding camera views for the current iteration
         rotating_cameras = GenerateRotatingBatchCameras(
             self.pose_args, 
             current_iter, 
@@ -176,7 +176,7 @@ class Scene:
             views_per_iter
         )
         
-        # 创建相机列表
+        # Create camera list
         rotating_cams = {}
         for resolution_scale in self.resolution_scales:
             rotating_cams[resolution_scale] = cameraList_from_RcamInfos(
@@ -189,22 +189,22 @@ class Scene:
     
     def getFullCoverageCameras(self, current_iter, total_iters=5000, views_per_iter=2, scale=1.0, render45=True, num_cycles=10):
         """
-        获取均匀覆盖全部360度的相机视角，确保所有视角都能在整个训练过程中多次更新
+        Get camera views that evenly cover the full 360 degrees, ensuring all angles are updated multiple times during training
         
         Args:
-            current_iter: 当前迭代次数
-            total_iters: 总迭代次数，默认为5000
-            views_per_iter: 每次迭代生成的正面视角数量，默认为2
-            scale: 分辨率缩放比例，默认为1.0
-            render45: 是否生成45度视角相机，默认为True
-            num_cycles: 将5000次迭代分成多少个周期，默认为10
+            current_iter: current iteration count
+            total_iters: total iteration count, default 5000
+            views_per_iter: number of front-view cameras per iteration, default 2
+            scale: resolution scale, default 1.0
+            render45: whether to generate 45-degree view cameras, default True
+            num_cycles: number of cycles to divide total iterations into, default 10
         
         Returns:
-            当前迭代的多个相机列表
+            list of cameras for the current iteration
         """
         from scene.dataset_readers import GenerateFullCoverageCameras
         
-        # 生成覆盖所有视角的相机
+        # Generate cameras covering all viewing angles
         full_coverage_cameras = GenerateFullCoverageCameras(
             self.pose_args, 
             current_iter, 
@@ -214,7 +214,7 @@ class Scene:
             num_cycles
         )
         
-        # 创建相机列表
+        # Create camera list
         coverage_cams = {}
         for resolution_scale in self.resolution_scales:
             coverage_cams[resolution_scale] = cameraList_from_RcamInfos(

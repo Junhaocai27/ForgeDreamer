@@ -15,7 +15,7 @@ import os
 import re
 # os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-# 禁用 tokenizers 并行处理警告
+# Disable tokenizers parallelism warning
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import torch
 import torch.nn as nn
@@ -49,10 +49,10 @@ def adjust_text_embeddings(embeddings, azimuth, guidance_opt):
     K = 0
     #for b in range(azimuth):
     if guidance_opt.fixed_view:
-        # 固定视角，使用随机生成的文本嵌入
+        # Fixed view, use randomly generated text embeddings
         text_z_, weights_ = get_pos_neg_text_embeddings_fixed(embeddings, azimuth, guidance_opt)
     else:
-        # 随机生成文本嵌入
+        # Randomly generate text embeddings
         text_z_, weights_ = get_pos_neg_text_embeddings_rand(embeddings, azimuth, guidance_opt)
     # text_z_, weights_ = get_pos_neg_text_embeddings_fixed(embeddings, azimuth, guidance_opt)
     # text_z_, weights_ = get_pos_neg_text_embeddings(embeddings, azimuth, guidance_opt)
@@ -128,7 +128,7 @@ def get_pos_neg_text_embeddings_fixed(embeddings, azimuth_val, opt):
         else:
             r = 1 + azimuth_val / 90
             
-        # 🔥 修复：直接创建tensor，避免clone()问题
+        # Fix: create tensor directly to avoid clone() issues
         r = torch.tensor(float(r), device=device, dtype=torch.float16)
         start_z = embeddings['front']
         end_z = embeddings['side']
@@ -137,7 +137,7 @@ def get_pos_neg_text_embeddings_fixed(embeddings, azimuth_val, opt):
         pos_z = r * start_z + (1 - r) * end_z
         text_z = torch.cat([pos_z, embeddings['front'], embeddings['side']], dim=0)
         
-        # 🔥 修复：确保r是标量值用于条件判断
+        # Fix: ensure r is a scalar for conditional checks
         r_val = r.item()
         if r_val > 0.8:
             front_neg_w = 0.0
@@ -155,7 +155,7 @@ def get_pos_neg_text_embeddings_fixed(embeddings, azimuth_val, opt):
         else:
             r = 1 + (azimuth_val + 90) / 90
         
-        # 🔥 修复：同样的处理
+        # Fix: same treatment
         r = torch.tensor(float(r), device=device, dtype=torch.float16)
         start_z = embeddings['side']
         end_z = embeddings['back']
@@ -164,7 +164,7 @@ def get_pos_neg_text_embeddings_fixed(embeddings, azimuth_val, opt):
         pos_z = r * start_z + (1 - r) * end_z
         text_z = torch.cat([pos_z, embeddings['side'], embeddings['front']], dim=0)
         
-        # 🔥 修复：确保r是标量值用于条件判断
+        # Fix: ensure r is a scalar for conditional checks
         r_val = r.item()
         front_neg_w = opt.negative_w 
         if r_val > 0.8:
@@ -189,21 +189,21 @@ def prepare_embeddings(guidance_opt, guidance):
 
 def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
     """
-    自动识别<>触发词并生成视角特定的文本嵌入
+    Auto-detect <> trigger words and generate view-specific text embeddings
     """
-    # 1. 提取基础触发词
-    base_text = guidance_opt.text  # 例如: "A DSLR photo of <nut>"
+    # 1. Extract base trigger word
+    base_text = guidance_opt.text  # e.g., "A DSLR photo of <nut>"
     trigger_pattern = r'<([^>]+)>'
     base_triggers = re.findall(trigger_pattern, base_text)
     
     if not base_triggers:
-        print("警告: 文本中未找到<>包裹的触发词，将使用原始文本")
+        print("Warning: no <> trigger word found in text, will use original text")
         base_trigger = None
     else:
-        base_trigger = base_triggers[0]  # 使用第一个触发词
-        print(f"✅ 检测到基础触发词: <{base_trigger}>")
+        base_trigger = base_triggers[0]  # use the first trigger word
+        print(f"✅ Detected base trigger word: <{base_trigger}>")
     
-    # 2. 创建视角特定的文本
+    # 2. Create view-specific texts
     if base_trigger:
         front_text = base_text.replace(f"<{base_trigger}>", f"<{base_trigger}_front>")
         up_text = base_text.replace(f"<{base_trigger}>", f"<{base_trigger}_up>")
@@ -211,17 +211,17 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
         front_text = base_text + ", front view"
         up_text = base_text + ", up view"
     
-    # 打印所有要使用的文本提示
-    print("\n==== 视角特定的文本提示 ====")
-    print(f"原始文本: {base_text}")
-    print(f"前视文本: {front_text}")  
-    print(f"上视文本: {up_text}")
+    # Print all text prompts to be used
+    print("\n==== View-specific text prompts ====")
+    print(f"Original text: {base_text}")
+    print(f"Front text: {front_text}")  
+    print(f"Up text: {up_text}")
     print("============================\n")
     
-    # 3. 创建嵌入字典
+    # 3. Create embedding dictionary
     embeddings = {}
     
-    # 前视图的嵌入集合
+    # Front-view embedding set
     embeddings_front = {}
     embeddings_front['default'] = guidance.get_text_embeds([front_text])
     embeddings_front['uncond'] = guidance.get_text_embeds([guidance_opt.negative])
@@ -230,7 +230,7 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
         view_text = f"{front_text}, {d} view"
         embeddings_front[d] = guidance.get_text_embeds([view_text])
     
-    # 处理前视图的反向文本
+    # Process front-view inverse text
     if isinstance(guidance_opt.inverse_text, list):
         inverse_texts_front = []
         for inv_text in guidance_opt.inverse_text:
@@ -247,7 +247,7 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
             inv_front = guidance_opt.inverse_text + ", front view"
         embeddings_front['inverse_text'] = guidance.get_text_embeds([inv_front])
     
-    # 上视图的嵌入集合
+    # Up-view embedding set
     embeddings_up = {}
     embeddings_up['default'] = guidance.get_text_embeds([up_text])
     embeddings_up['uncond'] = guidance.get_text_embeds([guidance_opt.negative])
@@ -256,7 +256,7 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
         view_text = f"{up_text}, {d} view"
         embeddings_up[d] = guidance.get_text_embeds([view_text])
     
-    # 处理上视图的反向文本
+    # Process up-view inverse text
     if isinstance(guidance_opt.inverse_text, list):
         inverse_texts_up = []
         for inv_text in guidance_opt.inverse_text:
@@ -273,7 +273,7 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
             inv_up = guidance_opt.inverse_text + ", up view"
         embeddings_up['inverse_text'] = guidance.get_text_embeds([inv_up])
     
-    # 4. 组合嵌入集合
+    # 4. Combine embedding sets
     view_embeddings = {
         'front': embeddings_front,
         'up': embeddings_up
@@ -283,16 +283,16 @@ def prepare_embeddings_with_view_triggers(guidance_opt, guidance):
 
 def select_embeddings_by_camera(view_embeddings, viewpoint_cam):
     """
-    根据相机角度选择合适的嵌入
+    Select appropriate embeddings based on camera angle
     """
-    # 获取相机的极角(倾斜角度)
+    # Get the camera polar angle (tilt)
     polar = getattr(viewpoint_cam, 'delta_polar', 0)
     
-    # 根据delta_polar判断视角类型
-    if polar != 0:  # 非零表示45度视角，使用up触发词
+    # Determine view type based on delta_polar
+    if polar != 0:  # non-zero means 45-degree view, use up trigger
         current_embeddings = view_embeddings['up']
         view_type = "up"
-    else:  # 为零表示正面视角，使用front触发词
+    else:  # zero means front view, use front trigger
         current_embeddings = view_embeddings['front'] 
         view_type = "front"
     
@@ -300,7 +300,7 @@ def select_embeddings_by_camera(view_embeddings, viewpoint_cam):
 
 def guidance_setup_enhanced(guidance_opt):
     """
-    增强版的guidance设置，支持视角特定的触发词
+    Enhanced guidance setup with support for view-specific trigger words
     """
     if guidance_opt.guidance=="SD":
         from guidance.sd_utils import StableDiffusion
@@ -318,7 +318,7 @@ def guidance_setup_enhanced(guidance_opt):
         for p in guidance.parameters():
             p.requires_grad = False
     
-    # 使用新的嵌入生成函数
+    # Use the new embedding generation function
     view_embeddings = prepare_embeddings_with_view_triggers(guidance_opt, guidance)
     
     return guidance, view_embeddings
@@ -357,7 +357,7 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
     iter_start = torch.cuda.Event(enable_timing = True)
     iter_end = torch.cuda.Event(enable_timing = True)
 
-    # 设置保存文件夹
+    # Set up save folder
     save_folder = os.path.join(dataset._model_path,"train_process/")
     if not os.path.exists(save_folder):
         os.makedirs(save_folder)
@@ -366,7 +366,7 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
     # controlnet
     use_control_net = False
     
-    # 🔥 使用增强版的guidance设置，支持视角特定的触发词
+    # Use enhanced guidance setup with view-specific trigger words
     guidance, view_embeddings = guidance_setup_enhanced(guidance_opt)   
     
     viewpoint_stack = None
@@ -383,7 +383,7 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
         save_process_iter = opt.iterations // len(process_view_points)
         pro_img_frames = []
     
-    # 🔥 为front和up视角分别创建反向文本嵌入
+    # Create separate inverse text embeddings for front and up views
     text_z_inverse_front = torch.cat([view_embeddings['front']['uncond'], view_embeddings['front']['inverse_text']], dim=0)
     text_z_inverse_up = torch.cat([view_embeddings['up']['uncond'], view_embeddings['up']['inverse_text']], dim=0)
 
@@ -436,15 +436,15 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
                 print('scale up fovy_range to:', scene.pose_args.fovy_range)
 
         if not viewpoint_stack and guidance_opt.fixed_view:
-            # 前期训练使用标准视角
-            if iteration < opt.warmup_iter:  # 在热身阶段前期使用标准视角
+            # Early training uses standard view
+            if iteration < opt.warmup_iter:  # use standard view during warm-up phase
                 viewpoint_stack = scene.getCircleVideoCameras(render45=False).copy()
                 render45_mode = False
-            else:  # 训练后期使用45度倾斜视角
+            else:  # later training uses 45-degree tilted view
                 viewpoint_stack = scene.getCircleVideoCameras(render45=True).copy()
                 render45_mode = True
         else:
-            # 如果视点栈为空且不是固定视角，则使用随机训练相机
+            # If viewpoint stack is empty and not fixed view, use random training cameras
             if not viewpoint_stack:
                 viewpoint_stack = scene.getRandTrainCameras().copy()
 
@@ -461,12 +461,12 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
             try:
                 viewpoint_cam = viewpoint_stack.pop(randint(0, len(viewpoint_stack)-1))            
             except:
-                # 视点栈选择逻辑
+                # Viewpoint stack selection logic
                 if guidance_opt.fixed_view:
-                    if iteration < opt.warmup_iter:  # 在热身阶段前期使用标准视角
+                    if iteration < opt.warmup_iter:  # use standard view during warm-up phase
                         viewpoint_stack = scene.getCircleVideoCameras(render45=False).copy()
                         render45_mode = False
-                    else:  # 训练后期使用45度倾斜视角
+                    else:  # later training uses 45-degree tilted view
                         viewpoint_stack = scene.getCircleVideoCameras(render45=True).copy()
                         render45_mode = True
                 else:
@@ -478,12 +478,12 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
 
         # for i in range(C_batch_size):
         #     try:
-        #         viewpoint_cam = viewpoint_stack.pop()  # 默认从末尾pop，也可以用pop(0)从开头pop
+        #         viewpoint_cam = viewpoint_stack.pop()  # default pops from end, can use pop(0) for front
         #     except:
         #         viewpoint_stack = scene.getRandTrainCameras().copy()
-        #         viewpoint_cam = viewpoint_stack.pop()  # 同样改为顺序pop
+        #         viewpoint_cam = viewpoint_stack.pop()  # also changed to sequential pop
                 
-            # 🔥 关键修改：根据相机角度选择嵌入
+            # Key change: select embeddings based on camera angle
             current_embeddings, view_type = select_embeddings_by_camera(view_embeddings, viewpoint_cam)
             
             # pred text_z
@@ -529,7 +529,7 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
             images.append(image)
             depths.append(depth)
             alphas.append(alpha)
-            viewpoint_cams.append(viewpoint_cam)  # 修正：应该添加viewpoint_cam而不是viewpoint_cams
+            viewpoint_cams.append(viewpoint_cam)  # correction: should add viewpoint_cam, not viewpoint_cams
 
         images = torch.stack(images, dim=0)
         depths = torch.stack(depths, dim=0)
@@ -544,8 +544,8 @@ def training(dataset, opt, pipe, gcams, guidance_opt, testing_iterations, saving
         if iteration > opt.use_control_net_iter and (random.random() < guidance_opt.controlnet_ratio):
             use_control_net = True
             
-        # 🔥 根据batch中主要的视角类型选择反向文本嵌入
-        # 简化处理：使用第一个相机的视角类型来决定
+        # Select inverse text embedding based on the dominant view type in the batch
+        # Simplified: use the first camera's view type to decide
         first_cam_embeddings, first_view_type = select_embeddings_by_camera(view_embeddings, viewpoint_cams[0])
         text_z_inverse = text_z_inverse_front if first_view_type == "front" else text_z_inverse_up
             
@@ -660,7 +660,7 @@ def training_report(tb_writer, iteration, elapsed, testing_iterations, scene : S
     if iteration in testing_iterations:
         save_folder = os.path.join(scene.args._model_path,"test_six_views/{}_iteration".format(iteration))
         if not os.path.exists(save_folder):
-            os.makedirs(save_folder)  # makedirs 创建文件时如果路径不存在会创建这个路径
+            os.makedirs(save_folder)  # makedirs creates intermediate directories if they do not exist
             print('test views is in :', save_folder)
         torch.cuda.empty_cache()
         config = ({'name': 'test', 'cameras' : scene.getTestCameras()})

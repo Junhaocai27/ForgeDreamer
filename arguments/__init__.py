@@ -106,16 +106,16 @@ class GuidanceParams(ParamGroup):
 
         self.vis_interval = 100
 
-        self.sd_loss_weight1 = 0.1   # SD损失的权重
-        self.sd_loss_weight2 = 1   # SD损失的权重
+        self.sd_loss_weight1 = 0.1   # Weight for SD loss
+        self.sd_loss_weight2 = 1   # Weight for SD loss
 
-        # 超图一致性损失参数
-        self.hypergraph_consistency_weight = 0.5    # 超图一致性损失权重
-        self.hypergraph_warmup_iters = 1500         # 超图一致性损失预热迭代次数
+        # Hypergraph consistency loss parameters
+        self.hypergraph_consistency_weight = 0.5    # Hypergraph consistency loss weight
+        self.hypergraph_warmup_iters = 1500         # Hypergraph consistency loss warm-up iterations
         
-        # 边缘引导损失参数
-        self.edge_loss_weight = 0.8                 # 边缘引导损失权重
-        self.edge_warmup_iters = 1000                # 边缘引导损失预热迭代次数
+        # Edge guidance loss parameters
+        self.edge_loss_weight = 0.8                 # Edge guidance loss weight
+        self.edge_warmup_iters = 1000                # Edge guidance loss warm-up iterations
         
         self.sd_matching_iter = 1500
 
