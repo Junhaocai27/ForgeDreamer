@@ -47,7 +47,7 @@ find "$LORA_MODELS_DIR" -name "*.safetensors" -o -name "*.pt" -o -name "*.pth" -
 echo ""
 
 # 运行多teacher蒸馏训练
-python /root/lora/lora_diffusion/distill_multi_lora_pic_good_result4.py \
+python /root/ForgeDreamer_FX/ForgeDreamer/LoRA_Distillation/lora_diffusion/distill_multi_lora_pic_good_result4.py \
   --lora_models_dir="$LORA_MODELS_DIR" \
   --pretrained_model_name_or_path="$BASE_MODEL" \
   --output_dir="$OUTPUT_DIR" \
