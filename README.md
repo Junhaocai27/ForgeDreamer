@@ -89,16 +89,11 @@ conda activate ForgeDreamer
 # 3. Set CUDA architecture list (adjust according to your GPU if necessary)
 export TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0+PTX"
 
-# 4. Install PyTorch (ensure the CUDA version matches your system)
-pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url [https://download.pytorch.org/whl/cu121](https://download.pytorch.org/whl/cu121)
-
-# 5. Install Python dependencies
+# 4. Install Python dependencies
 pip install -r requirements.txt
-pip install dhg
-# pip install dhg==0.9.5 --no-deps
+pip install dhg==0.9.5 --no-deps
 
-# 6. Install custom submodules and local packages
+# 5. Install custom submodules and local packages
 pip install submodules/diff-gaussian-rasterization --no-build-isolation
 pip install submodules/simple-knn/ --no-build-isolation
-pip install ./point-e --no-build-isolation
 pip install ./LoRA_Distillation --no-build-isolation
