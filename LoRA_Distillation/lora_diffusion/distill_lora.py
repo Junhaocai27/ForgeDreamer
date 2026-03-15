@@ -1084,131 +1084,41 @@ def train_inversion_with_multi_feature_alignment(
             for i, count in enumerate(teacher_selection_counts):
                 writer.add_scalar(f'teacher_stats/Teacher_{i+1:02d}_selection_count', count, global_step)
             
-            # 🔥 Log per-layer hybrid feature loss detailed information
-            if isinstance(unet_detailed_loss_info, dict):
-                for layer_name, layer_loss in unet_detailed_loss_info.items():
-                    # 🔥 Strict type checking and conversion
-                    if isinstance(layer_loss, (int, float)):
-                        # Use numeric value directly
-                        clean_layer_name = layer_name.replace(".", "_")
-                        writer.add_scalar(f'UNet_hybrid_feature_loss_layer/{clean_layer_name}', 
-                                        layer_loss, global_step)
-                        # Log categorized by teacher
-                        writer.add_scalar(f'teacher_UNet_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
-                                        layer_loss, global_step)
-                    elif isinstance(layer_loss, torch.Tensor):
-                        # Tensor type, extract numeric value
-                        if layer_loss.numel() == 1:  # Scalar tensor
-                            clean_layer_name = layer_name.replace(".", "_")
-                            loss_value = layer_loss.item()
-                            writer.add_scalar(f'UNet_hybrid_feature_loss_layer/{clean_layer_name}', 
-                                            loss_value, global_step)
-                            writer.add_scalar(f'teacher_UNet_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
-                                            loss_value, global_step)
-                        else:
-                            print(f"⚠️ Skipping non-scalar tensor loss logging: {layer_name} (shape: {layer_loss.shape})")
-                    elif isinstance(layer_loss, str) and layer_loss.replace('.', '', 1).replace('-', '', 1).isdigit():
-                        # String number, try to convert
-                        try:
-                            loss_value = float(layer_loss)
-                            clean_layer_name = layer_name.replace(".", "_")
-                            writer.add_scalar(f'UNet_hybrid_feature_loss_layer/{clean_layer_name}', 
-                                            loss_value, global_step)
-                            writer.add_scalar(f'teacher_UNet_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
-                                            loss_value, global_step)
-                        except (ValueError, TypeError):
-                            print(f"⚠️ Skipping unconvertible loss value: {layer_name}={layer_loss} (type: {type(layer_loss)})")
-                    else:
-                        # Other types (e.g., "hybrid" config strings), skip logging without error
-                        if not isinstance(layer_loss, str) or layer_loss not in ['hybrid', 'mse', 'cosine', 'scale_aware_cosine', 'layer_adaptive']:
-                            print(f"⚠️ Skipping non-numeric loss logging: {layer_name}={layer_loss} (type: {type(layer_loss)})")
-            
-            if isinstance(text_detailed_loss_info, dict):
-                for layer_name, layer_loss in text_detailed_loss_info.items():
-                    # 🔥 Same type checking and conversion logic
-                    if isinstance(layer_loss, (int, float)):
-                        clean_layer_name = layer_name.replace(".", "_")
-                        writer.add_scalar(f'TextEncoder_hybrid_feature_loss_layer/{clean_layer_name}', 
-                                        layer_loss, global_step)
-                        writer.add_scalar(f'teacher_TextEncoder_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
-                                        layer_loss, global_step)
-                    elif isinstance(layer_loss, torch.Tensor):
-                        if layer_loss.numel() == 1:  # Scalar tensor
-                            clean_layer_name = layer_name.replace(".", "_")
-                            loss_value = layer_loss.item()
-                            writer.add_scalar(f'TextEncoder_hybrid_feature_loss_layer/{clean_layer_name}', 
-                                            loss_value, global_step)
-                            writer.add_scalar(f'teacher_TextEncoder_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
-                                            loss_value, global_step)
-                        else:
-                            print(f"⚠️ Skipping non-scalar tensor loss logging: {layer_name} (shape: {layer_loss.shape})")
-                    elif isinstance(layer_loss, str) and layer_loss.replace('.', '', 1).replace('-', '', 1).isdigit():
-                        try:
-                            loss_value = float(layer_loss)
-                            clean_layer_name = layer_name.replace(".", "_")
-                            writer.add_scalar(f'TextEncoder_hybrid_feature_loss_layer/{clean_layer_name}', 
-                                            loss_value, global_step)
-                            writer.add_scalar(f'teacher_TextEncoder_hybrid_layer_loss/{teacher_name_for_tb}/{clean_layer_name}', 
-                                            loss_value, global_step)
-                        except (ValueError, TypeError):
-                            print(f"⚠️ Skipping unconvertible loss value: {layer_name}={layer_loss} (type: {type(layer_loss)})")
-                    else:
-                        # Skip config-type strings without error
-                        if not isinstance(layer_loss, str) or layer_loss not in ['hybrid', 'mse', 'cosine', 'scale_aware_cosine', 'layer_adaptive']:
-                            print(f"⚠️ Skipping non-numeric loss logging: {layer_name}={layer_loss} (type: {type(layer_loss)})")
+            _log_layer_losses(
+                writer,
+                'UNet_hybrid_feature_loss_layer', 'TextEncoder_hybrid_feature_loss_layer',
+                'teacher_UNet_hybrid_layer_loss', 'teacher_TextEncoder_hybrid_layer_loss',
+                unet_detailed_loss_info, text_detailed_loss_info, teacher_name_for_tb, global_step
+            )
 
-    # === Final statistics report including hybrid loss information ===
-    print(f"\n" + "="*80)
-    print(f"Multi-TEACHER hybrid feature alignment training complete - Final statistics report")
-    print(f"="*80)
-    print(f"Total completed steps: {global_step}")
-    print(f"Number of teacher models used: {num_teachers}")
-    print(f"Final learning rate: {current_lr_val:.2e}")
-    print(f"Teacher selection strategy: {teacher_selection_strategy}")
-    print(f"🔥 Hybrid loss configuration:")
-    print(f"   UNet: {unet_feature_loss_type} ({unet_primary_loss_type}+{unet_secondary_loss_type})")
-    print(f"   Text: {text_encoder_loss_type} ({text_encoder_primary_loss_type}+{text_encoder_secondary_loss_type})")
-    
-    # Record final teacher hybrid loss statistics to TensorBoard
+    print(f"\nMulti-teacher hybrid FA inversion complete: steps={global_step}, "
+          f"lr={current_lr_val:.2e}, teachers={num_teachers}, strategy={teacher_selection_strategy}")
     if writer:
         for i, tracker in enumerate(teacher_loss_trackers):
             teacher_name = f"Teacher_{i+1:02d}"
             step_count = tracker['step_count']
-            
             if step_count > 0:
-                # Original statistics
-                final_avg_ti_loss = tracker['ti_loss'] / step_count
-                final_avg_unet_loss = tracker['unet_feature_loss'] / step_count
-                final_avg_text_loss = tracker['text_encoder_feature_loss'] / step_count
-                final_avg_total_loss = tracker['total_loss'] / step_count
-                final_usage_freq = step_count / global_step
-                
-                # 🔥 New hybrid loss statistics
-                final_avg_unet_primary = tracker['unet_primary_loss'] / step_count
-                final_avg_unet_secondary = tracker['unet_secondary_loss'] / step_count
-                final_avg_text_primary = tracker['text_primary_loss'] / step_count
-                final_avg_text_secondary = tracker['text_secondary_loss'] / step_count
-                
-                # Record final statistics
+                sc = step_count
+                final_avg_ti_loss = tracker['ti_loss'] / sc
+                final_avg_unet_loss = tracker['unet_feature_loss'] / sc
+                final_avg_text_loss = tracker['text_encoder_feature_loss'] / sc
+                final_avg_total_loss = tracker['total_loss'] / sc
+                final_usage_freq = sc / global_step
+                final_avg_unet_primary = tracker['unet_primary_loss'] / sc
+                final_avg_unet_secondary = tracker['unet_secondary_loss'] / sc
+                final_avg_text_primary = tracker['text_primary_loss'] / sc
+                final_avg_text_secondary = tracker['text_secondary_loss'] / sc
                 writer.add_scalar(f'final_stats/{teacher_name}/final_avg_TI_loss', final_avg_ti_loss, global_step)
                 writer.add_scalar(f'final_stats/{teacher_name}/final_avg_UNet_loss', final_avg_unet_loss, global_step)
                 writer.add_scalar(f'final_stats/{teacher_name}/final_avg_Text_loss', final_avg_text_loss, global_step)
                 writer.add_scalar(f'final_stats/{teacher_name}/final_avg_total_loss', final_avg_total_loss, global_step)
                 writer.add_scalar(f'final_stats/{teacher_name}/final_usage_frequency', final_usage_freq, global_step)
-                
-                # 🔥 Final hybrid loss statistics
                 writer.add_scalar(f'final_hybrid_stats/{teacher_name}/UNet_primary_loss_mean', final_avg_unet_primary, global_step)
                 writer.add_scalar(f'final_hybrid_stats/{teacher_name}/UNet_secondary_loss_mean', final_avg_unet_secondary, global_step)
                 writer.add_scalar(f'final_hybrid_stats/{teacher_name}/Text_primary_loss_mean', final_avg_text_primary, global_step)
                 writer.add_scalar(f'final_hybrid_stats/{teacher_name}/Text_secondary_loss_mean', final_avg_text_secondary, global_step)
-                
-                print(f"\n📈 {teacher_name} final hybrid loss statistics:")
-                print(f"   Total usage count: {step_count}/{global_step} ({final_usage_freq:.2%})")
-                print(f"   Final average TI loss: {final_avg_ti_loss:.6f}")
-                print(f"   🔥 UNet hybrid loss: primary={final_avg_unet_primary:.6f}, secondary={final_avg_unet_secondary:.6f}")
-                print(f"   🔥 Text hybrid loss: primary={final_avg_text_primary:.6f}, secondary={final_avg_text_secondary:.6f}")
-                print(f"   Final average total loss: {final_avg_total_loss:.6f}")
-    
+                print(f"  {teacher_name}: steps={sc}/{global_step} ({final_usage_freq:.2%}), "
+                      f"ti={final_avg_ti_loss:.4f}, total={final_avg_total_loss:.4f}")
     writer.close()
     
     final_save_dir = os.path.join(save_path, out_name)
@@ -1294,32 +1204,14 @@ def perform_tuning_multi_teacher(
     noise_only_steps: int = 1000,
     feature_only_steps: int = 0,
 ):
-    """
-    🔥 Perform multi-teacher LoRA fine-tuning with hybrid loss support
+    """Multi-teacher LoRA fine-tuning with hybrid feature alignment loss."""
     
-    New features:
-    1. Hybrid feature alignment loss for UNet and Text Encoder
-    2. Support for multiple loss types: hybrid, scale_aware_cosine, layer_adaptive
-    3. Configurable primary/secondary loss weight ratio
-    4. Alternating optimization strategy
-    5. Detailed loss decomposition monitoring
-    """
-    
-    # Validate input parameters
     assert len(teacher_unets) == len(teacher_text_encoders) == len(dataloaders), \
         "teacher_unets, teacher_text_encoders, and dataloaders must have the same length"
     
     num_teachers = len(teacher_unets)
-    print(f"🔥 Hybrid loss LoRA fine-tuning with {num_teachers} teacher models")
-    
-    import os
-    import torch
-    import torch.nn.functional as F
-    from tqdm import tqdm
-    from torch.utils.tensorboard import SummaryWriter
-    import datetime
-    
-    # === Alternating optimization controller ===
+    print(f"Hybrid-loss LoRA fine-tuning with {num_teachers} teacher models")
+
     class AlternatingOptimizationController:
         def __init__(self):
             self.current_mode = "noise"  # "noise" or "feature"
@@ -1379,41 +1271,27 @@ def perform_tuning_multi_teacher(
             if len(self.feature_loss_history) > 20:
                 self.feature_loss_history.pop(0)
 
-    # Create alternating optimization controller
     if use_alternating_optimization:
         alt_controller = AlternatingOptimizationController()
-        print(f"✅ Alternating optimization mode enabled:")
-        print(f"   • Alternating interval: {alternating_interval} steps")
-        print(f"   • Scheduling strategy: {alternating_schedule}")
-        if noise_only_steps > 0:
-            print(f"   • Noise-only optimization: first {noise_only_steps} steps")
-        if feature_only_steps > 0:
-            print(f"   • Feature-only optimization: last {feature_only_steps} steps")
+        print(f"Alternating optimization: interval={alternating_interval}, schedule={alternating_schedule}, "
+              f"noise_only={noise_only_steps}, feature_only={feature_only_steps}")
     else:
         alt_controller = None
-        print(f"📊 Using traditional joint loss optimization mode")
+        print("Joint loss optimization mode")
 
-    # === TensorBoard setup ===
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     opt_mode = "alternating" if use_alternating_optimization else "joint"
     tb_log_path = os.path.join(tensorboard_log_dir, f"{out_name}_{opt_mode}_multi_teacher_hybrid_lora_{timestamp}")
-    
-    if not os.path.exists(tb_log_path):
-        os.makedirs(tb_log_path, exist_ok=True)
+    os.makedirs(tb_log_path, exist_ok=True)
     writer = SummaryWriter(log_dir=tb_log_path)
-    print(f"📊 TensorBoard logs will be saved to: {tb_log_path}")
+    print(f"TensorBoard logs: {tb_log_path}")
 
-    # === 🔥 Hybrid feature alignment loss function component setup ===
-    
-    # UNet hybrid feature alignment
     alignment_layers_for_loss = feature_alignment_unet_layers
-    layer_weights_for_loss = {
+    layer_weights_for_loss = {k: v for k, v in {
         'mid_block': 2.0, 'down_blocks.2': 1.5, 'down_blocks.3': 1.5,
         'up_blocks.0': 1.5, 'up_blocks.1': 1.5,
-    }
-    layer_weights_for_loss = {k: v for k, v in layer_weights_for_loss.items() if k in alignment_layers_for_loss}
+    }.items() if k in alignment_layers_for_loss}
 
-    # 🔥 Create hybrid UNet feature alignment loss function
     from feature_hook_unet import create_hybrid_unet_alignment_loss
     
     unet_feature_alignment_loss_fn = create_hybrid_unet_alignment_loss(
@@ -1429,25 +1307,17 @@ def perform_tuning_multi_teacher(
         channel_alignment="projection"
     )
     
-    print(f"🔥 UNet hybrid feature alignment loss configuration:")
-    print(f"   - Loss type: {unet_feature_loss_type}")
-    if unet_feature_loss_type == "hybrid":
-        print(f"   - Primary loss: {unet_primary_loss_type} ({100*(1-unet_loss_combination_weight):.1f}%)")
-        print(f"   - Secondary loss: {unet_secondary_loss_type} ({100*unet_loss_combination_weight:.1f}%)")
+    print(f"UNet feature alignment: type={unet_feature_loss_type}")
+    print(f"Text Encoder feature alignment: type={text_encoder_loss_type}, pooling={text_encoder_pooling_strategy}")
 
-    # 🔥 Text Encoder hybrid feature alignment
     from feature_hook_text_encoder import (
         TextEncoderFeatureExtractor, 
         create_hybrid_text_encoder_alignment_loss
     )
-    
-    # Text Encoder feature extractor
     text_encoder_feature_extractor = TextEncoderFeatureExtractor(
         target_layers=text_encoder_alignment_layers,
         mixed_precision_config=mixed_precision
     )
-
-    # 🔥 Text Encoder hybrid feature alignment loss function
     text_encoder_feature_alignment_loss_fn = create_hybrid_text_encoder_alignment_loss(
         alignment_layers=text_encoder_alignment_layers,
         loss_type=text_encoder_loss_type,
@@ -1457,26 +1327,12 @@ def perform_tuning_multi_teacher(
         loss_combination_weight=text_encoder_loss_combination_weight,
         use_layer_adaptive=text_encoder_use_layer_adaptive
     )
-    
-    print(f"🔥 Text Encoder hybrid feature alignment loss configuration:")
-    print(f"   - Loss type: {text_encoder_loss_type}")
-    print(f"   - Pooling strategy: {text_encoder_pooling_strategy}")
-    if text_encoder_loss_type == "hybrid":
-        print(f"   - Primary loss: {text_encoder_primary_loss_type} ({100*(1-text_encoder_loss_combination_weight):.1f}%)")
-        print(f"   - Secondary loss: {text_encoder_secondary_loss_type} ({100*text_encoder_loss_combination_weight:.1f}%)")
 
-    # Create UNet feature extractor for each teacher
     from feature_hook_unet import UNetFeatureExtractor
-    
-    teacher_extractors = []
-    for i, teacher_unet in enumerate(teacher_unets):
-        extractor = UNetFeatureExtractor(
-            target_layers=feature_alignment_unet_layers,
-            mixed_precision_config=mixed_precision
-        )
-        teacher_extractors.append(extractor)
-    
-    # Create student UNet feature extractor
+    teacher_extractors = [
+        UNetFeatureExtractor(target_layers=feature_alignment_unet_layers, mixed_precision_config=mixed_precision)
+        for _ in teacher_unets
+    ]
     student_extractor = UNetFeatureExtractor(
         target_layers=feature_alignment_unet_layers,
         mixed_precision_config=mixed_precision
@@ -1484,28 +1340,16 @@ def perform_tuning_multi_teacher(
 
     progress_bar = tqdm(range(num_steps), desc=f"Multi-Teacher Hybrid LoRA ({'Alternating' if use_alternating_optimization else 'Joint'}) Training")
     global_step = 0
-
-    # Initialize dataloader iterators
     dataloader_iters = [iter(dl) for dl in dataloaders]
-    teacher_selection_index = 0  # Used for round_robin strategy
+    teacher_selection_index = 0
 
-    # === Hybrid loss statistics for each teacher model ===
-    teacher_loss_trackers = []
-    for i in range(num_teachers):
-        teacher_loss_trackers.append({
-            'noise_pred_loss': 0.0,
-            'unet_feature_align_loss': 0.0,
-            'text_encoder_feature_align_loss': 0.0,
-            'total_loss': 0.0,
-            'step_count': 0,
-            # 🔥 New hybrid loss tracking
-            'unet_primary_loss': 0.0,
-            'unet_secondary_loss': 0.0,
-            'text_primary_loss': 0.0,
-            'text_secondary_loss': 0.0,
-        })
+    teacher_loss_trackers = [{
+        'noise_pred_loss': 0.0, 'unet_feature_align_loss': 0.0,
+        'text_encoder_feature_align_loss': 0.0, 'total_loss': 0.0, 'step_count': 0,
+        'unet_primary_loss': 0.0, 'unet_secondary_loss': 0.0,
+        'text_primary_loss': 0.0, 'text_secondary_loss': 0.0,
+    } for _ in range(num_teachers)]
 
-    # Accumulated losses for interval logging
     accumulated_total_loss = 0.0
     accumulated_noise_loss = 0.0
     accumulated_unet_feature_loss = 0.0
