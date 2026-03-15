@@ -14,7 +14,7 @@ class SubjectMaskGenerator:
     """
     Class for subject mask generation using FastSAM
     """
-    def __init__(self, device, fastsam_checkpoint_path="/root/LucidDreamer/FastSAM/FastSAM.pt"):
+    def __init__(self, device, fastsam_checkpoint_path="FastSAM/FastSAM.pt"):
         """
         Initialize the FastSAM model
         

@@ -1,6 +1,6 @@
-export MODEL_NAME="/root/stable-diffusion-2-1-base"
-export INSTANCE_DIR="/root/lora_train_imgs/lora_yellow_light_diode_up"
-export OUTPUT_DIR="/root/lora_weight_before_distill/yellow_light_diode_up_new2"
+export MODEL_NAME="stable-diffusion-2-1-base"
+export INSTANCE_DIR="lora_train_imgs/lora_yellow_light_diode_up"
+export OUTPUT_DIR="lora_weight_before_distill/yellow_light_diode_up_new2"
 
 lora_pti \
   --pretrained_model_name_or_path=$MODEL_NAME  \

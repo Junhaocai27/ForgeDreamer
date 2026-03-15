@@ -51,7 +51,7 @@ def init_from_pointe(input_path, use_image=False):
             guidance_scale=[3.0, 3.0],
         )
 
-        img = Image.open('/root/lora_train_imgs/lora_red_light_diode_front/6.jpg')
+        img = Image.open('lora_train_imgs/lora_red_light_diode_front/6.jpg')
         
         # Generate samples from the model
         samples = None

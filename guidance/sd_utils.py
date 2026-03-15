@@ -201,7 +201,7 @@ def seed_everything(seed):
 class StableDiffusion(nn.Module):
     def __init__(self, device, fp16, vram_O, t_range=[0.02, 0.98], max_t_range=0.98, num_train_timesteps=None, 
                  ddim_inv=False, use_control_net=False, textual_inversion_path = None, 
-                 LoRA_path = None, guidance_opt=None, use_subject_mask=True, sam_checkpoint_path='/root/LucidDreamer/guidance/sam_vit_b_01ec64.pth',
+                 LoRA_path = None, guidance_opt=None, use_subject_mask=True, sam_checkpoint_path='guidance/sam_vit_b_01ec64.pth',
                  mask_strategy='advanced',
                  mask_on_subject=True):
         super().__init__()

@@ -19,10 +19,10 @@ echo ""
 export PYTHONPATH="$(cd "$(dirname "$0")/../.."; pwd):$PYTHONPATH"
 
 # 训练配置
-LORA_MODELS_DIR="/root/lora_weight_before_distill/distill_weight8"
-BASE_MODEL="/root/stable-diffusion-2-1-base"
-OUTPUT_DIR="/root/lora_train/multi_combine_$(date +%Y%m%d_%H%M%S)"
-GENERATED_IMAGES_DIR="/root/lora_train/pic"
+LORA_MODELS_DIR="lora_weight_before_distill/distill_weight8"
+BASE_MODEL="stable-diffusion-2-1-base"
+OUTPUT_DIR="lora_train/multi_combine_$(date +%Y%m%d_%H%M%S)"
+GENERATED_IMAGES_DIR="lora_train/pic"
 
 # 创建输出目录
 mkdir -p "$OUTPUT_DIR"

@@ -726,7 +726,7 @@ if __name__ == "__main__":
     # Set up command line argument parser
     parser = ArgumentParser(description="Training script parameters")
 
-    parser.add_argument('--opt', type=str, default='/home/s414e2/CJH/Text-to-3D/LucidDreamer/configs/screw_lora.yaml')
+    parser.add_argument('--opt', type=str, default='configs/screw.yaml')
     parser.add_argument('--ip', type=str, default="127.0.0.1")
     parser.add_argument('--port', type=int, default=6009)
     parser.add_argument('--debug_from', type=int, default=-1)
