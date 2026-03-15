@@ -389,7 +389,7 @@ def loss_step_gaussian_noise(
         if mask.ndim == 3:
             mask = mask.unsqueeze(1)
         elif mask.ndim != 4 or mask.shape[1] != 1:
-            raise ValueError(f"Mask shape error: {mask.shape}. Expected [B, 1, H, W] or [B, H, W]")
+            raise ValueError(f"Invalid mask shape: {mask.shape}. Expected shape is [B, 1, H, W] or [B, H, W]")
 
         mask = (mask + 0.01).pow(mask_temperature)
         mask = mask / mask.max()
