@@ -792,40 +792,6 @@ class StableDiffusion(nn.Module):
         # pred_noise = noise_pred_uncond + current_guidance_scale * delta_DSD
         w = lambda alphas: (((1 - alphas) / alphas) ** 0.5)
 
-        latent_mask_input = None
-        latent_mask_pred = None
-
-        # if self.use_subject_mask and self.subject_mask_generator is not None:
-        if self.use_subject_mask is not None:
-
-            # =================== 1. Generate mask for pred_rgb (batch_size=4) ===================
-            # Since we always regenerate, image_indices and caching logic are no longer needed
-            mask_list_input = []
-            # print("[Masking] Generating masks for input images (pred_rgb)...")
-            for i in range(pred_rgb.shape[0]):
-                # Generate directly without passing image_index
-                mask = self._get_or_generate_latent_mask(pred_rgb[i], image_index=None)
-                mask_list_input.append(mask)
-            latent_mask_input = torch.cat(mask_list_input, dim=0)
-
-
-            # =================== 2. Generate mask for pred_x0_pos (batch_size=4) ===================
-            # This part of the logic remains unchanged as it was already generated in real time
-            with torch.no_grad():
-                noise_pred_post = noise_pred_uncond + guidance_opt.guidance_scale * delta_DSD    
-                pred_x0_latent_pos = pred_original(self.scheduler, noise_pred_post, prev_t, prev_latents_noisy) 
-                pred_x0_pos = self.decode_latents(pred_x0_latent_pos.type(self.precision_t))
-
-            mask_list_pred = []
-            # print("[Masking] Generating masks for SD predicted images (pred_x0_pos)...")
-            for i in range(pred_x0_pos.shape[0]):
-                mask = self._get_or_generate_latent_mask(pred_x0_pos[i], image_index=None)
-                mask_list_pred.append(mask)
-            latent_mask_pred = torch.cat(mask_list_pred, dim=0)
-
-        # print(f"[DEBUG] latent_mask_input.shape: {latent_mask_input.shape if latent_mask_input is not None else 'None'}")
-        # print(f"[DEBUG] latent_mask_pred.shape: {latent_mask_pred.shape if latent_mask_pred is not None else 'None'}")
-
         grad = w(self.alphas[t]) * (pred_noise - target)
 
         # Print the shape of grad here
@@ -865,9 +831,7 @@ class StableDiffusion(nn.Module):
                 grad_enhancement, dhg_latent_loss = self.dhg_latent_hypergraph(
                     latents,          # original latents [B, 4, 64, 64]
                     (prev_latents_noisy-pred_noise),    # noisy latents [B, 4, 64, 64]
-                    iteration,        # current iteration, used to decide whether to reconstruct\
-                    mask1=latent_mask_pred,
-                    mask2=latent_mask_input,
+                    iteration,        # current iteration, used to decide whether to reconstruct
                 )
                 
                 # print(f"[DEBUG] DHG Latent grad_enhancement.shape: {grad_enhancement.shape}")

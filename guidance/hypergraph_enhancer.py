@@ -364,21 +364,7 @@ class DirectSimilarityDHGLatentHypergraph(nn.Module):
         
         return enhanced_features
     
-    def transform_spatial_mask_to_node_mask(self, spatial_mask, node_features):
-        """
-        Transform a spatial mask [B, 1, H, W] into a node mask [N, D].
-        """
-        num_nodes, feature_dim = node_features.shape
-        
-        # Flatten the spatial mask to match node order
-        flattened_mask = spatial_mask.view(num_nodes)
-        
-        # Expand to match feature dimension
-        node_mask = flattened_mask.unsqueeze(1).repeat(1, feature_dim)
-        
-        return node_mask
-    
-    def forward(self, original_latents, denoised_latents, iteration, target_grad_norm=None, mask1=None, mask2=None):
+    def forward(self, original_latents, denoised_latents, iteration, target_grad_norm=None):
         """
         Forward pass - first apply hypergraph convolution to both latents separately, then compute the difference
         Args:
@@ -412,16 +398,7 @@ class DirectSimilarityDHGLatentHypergraph(nn.Module):
             enhanced_denoised_features = self.apply_hypergraph_convolution(denoised_hypergraph_data, denoised_node_features)
             
             # 4. Compute the enhanced difference
-            # print(f"mask1 shape: {mask1.shape}")
-            # print(f"mask2 shape: {mask2.shape}")
-            # print(f"enhanced_denoised_features shape: {enhanced_denoised_features.shape}")
-            # print(f"enhanced_original_features shape: {enhanced_original_features.shape}")
-
-            node_mask_denoised = self.transform_spatial_mask_to_node_mask(mask1, enhanced_denoised_features)
-            node_mask_original = self.transform_spatial_mask_to_node_mask(mask2, enhanced_original_features)
-            
-            enhanced_diff_features = (node_mask_denoised * enhanced_denoised_features) - (node_mask_original * enhanced_original_features)
-            # enhanced_diff_features = enhanced_denoised_features - enhanced_original_features
+            enhanced_diff_features = enhanced_denoised_features - enhanced_original_features
             
             # 5. Convert back to latents format
             grad_enhancement = self.node_features_to_latents(enhanced_diff_features, batch_info)
