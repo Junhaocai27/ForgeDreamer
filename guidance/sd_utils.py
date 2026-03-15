@@ -37,130 +37,6 @@ from .mask_utils import SubjectMaskGenerator
 
 from .sd_step import *
 
-# def generate_advanced_mask_hsv(original_image: np.ndarray, verbose: bool = False) -> Union[np.ndarray, None]:
-#     """
-#     【增强版 HSV 蒙版生成器】适用于白色背景图像中物体的分割。
-#     """
-#     if verbose:
-#         print("--- [generate_advanced_mask_hsv] 使用HSV分割白色背景物体 ---")
-
-#     if original_image.ndim != 3 or original_image.shape[2] != 3:
-#         if verbose: print("错误: 输入图像必须是3通道BGR格式。")
-#         return None
-
-#     height, width = original_image.shape[:2]
-
-#     # 转换为 HSV 色彩空间
-#     hsv = cv2.cvtColor(original_image, cv2.COLOR_BGR2HSV)
-#     h, s, v = cv2.split(hsv)
-
-#     # --- 步骤 1: 白色背景剔除 ---
-#     # 白色区域的 S 非常低，V 很高，我们用它来判断背景
-#     # 白色条件: S < 30 且 V > 200
-#     white_bg_mask = cv2.inRange(hsv, (0, 0, 200), (180, 30, 255))
-#     fg_mask = cv2.bitwise_not(white_bg_mask)  # 主体区域 = 非白色区域
-
-#     if verbose:
-#         white_ratio = np.mean(white_bg_mask > 0)
-#         print(f"[HSV] 背景白色比例: {white_ratio*100:.2f}%")
-
-#     # --- 步骤 2: 边缘 & 连通区域增强 ---
-#     edges = cv2.Canny(fg_mask, 50, 150)
-#     dilated_edges = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=1)
-#     fg_mask = cv2.bitwise_or(fg_mask, dilated_edges)
-
-#     # --- 步骤 3: 形态学处理 ---
-#     kernel_size = max(3, min(9, int(min(height, width) / 200)))
-#     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-#     fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel, iterations=1)
-#     fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-#     if verbose:
-#         print(f"形态学处理完成，核大小: {kernel_size}")
-
-#     # --- 步骤 4: 连通域分析保留最大主体 ---
-#     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(fg_mask, connectivity=8)
-#     if num_labels <= 1:
-#         if verbose: print("未找到主体区域，返回初步掩码。")
-#         return fg_mask
-    
-#     largest_component = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
-#     final_mask = np.zeros_like(fg_mask)
-#     final_mask[labels == largest_component] = 255
-#     if verbose: print(f"保留最大连通域作为主体，面积: {stats[largest_component, cv2.CC_STAT_AREA]}")
-
-#     # --- 步骤 5: 轮廓优化 & 模糊边缘 ---
-#     contours, _ = cv2.findContours(final_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-#     if not contours:
-#         if verbose: print("未找到轮廓，直接返回。")
-#         return final_mask
-
-#     refined_mask = np.zeros_like(final_mask)
-#     cv2.drawContours(refined_mask, [max(contours, key=cv2.contourArea)], -1, 255, thickness=cv2.FILLED)
-
-#     refined_mask = cv2.dilate(refined_mask, np.ones((3, 3), np.uint8), iterations=1)
-#     refined_mask = cv2.GaussianBlur(refined_mask, (5, 5), 0)
-
-#     if verbose: print("边缘优化完成，生成最终掩码。")
-#     return refined_mask
-
-# def generate_advanced_mask_hsv(original_image: np.ndarray, verbose: bool = False) -> Union[np.ndarray, None]:
-#     """
-#     【修改版】适用于白色背景图像中物体的分割，生成一个值为 0 和 1 的二值掩码。
-#     """
-#     if verbose:
-#         print("--- [generate_advanced_mask_hsv] 使用HSV分割白色背景物体 ---")
-
-#     if original_image.ndim != 3 or original_image.shape[2] != 3:
-#         if verbose: print("错误: 输入图像必须是3通道BGR格式。")
-#         return None
-
-#     height, width = original_image.shape[:2]
-
-#     # 转换为 HSV 色彩空间
-#     hsv = cv2.cvtColor(original_image, cv2.COLOR_BGR2HSV)
-    
-#     # --- 步骤 1: 白色背景剔除 ---
-#     # 白色区域的 S 非常低，V 很高
-#     white_bg_mask = cv2.inRange(hsv, (0, 0, 240), (180, 10, 255))
-#     fg_mask = cv2.bitwise_not(white_bg_mask)  # 主体区域 = 非白色区域 (0/255)
-
-#     if verbose:
-#         white_ratio = np.mean(white_bg_mask > 0)
-#         print(f"[HSV] 背景白色比例: {white_ratio*100:.2f}%")
-
-#     # --- 步骤 2: 边缘 & 连通区域增强 ---
-#     edges = cv2.Canny(fg_mask, 50, 150)
-#     dilated_edges = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=1)
-#     fg_mask = cv2.bitwise_or(fg_mask, dilated_edges)
-
-#     # --- 步骤 3: 形态学处理 ---
-#     kernel_size = max(3, min(9, int(min(height, width) / 200)))
-#     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-#     fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, kernel, iterations=1)
-#     fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
-#     if verbose:
-#         print(f"形态学处理完成，核大小: {kernel_size}")
-
-#     # --- 步骤 4: 连通域分析保留最大主体 ---
-#     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(fg_mask, connectivity=8)
-#     if num_labels <= 1:
-#         if verbose: print("未找到主体区域，返回初步清理后的掩码。")
-#         # 【修改点 1】: 如果提前返回，也要确保是 0/1 格式
-#         return (fg_mask / 255).astype(np.uint8)
-    
-#     largest_component = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
-#     final_mask_255 = np.zeros_like(fg_mask)
-#     final_mask_255[labels == largest_component] = 255
-#     if verbose: print(f"保留最大连通域作为主体，面积: {stats[largest_component, cv2.CC_STAT_AREA]}")
-
-#     # --- 步骤 5: 转换为 0/1 二值掩码 ---
-#     # 【修改点 2】: 移除了原有的轮廓平滑和高斯模糊步骤。
-#     # 用简单的除法和类型转换来生成 0/1 掩码。
-#     final_mask_01 = (final_mask_255 / 255).astype(np.uint8)
-
-#     if verbose: print("生成 0/1 二值掩码完成。")
-#     return final_mask_01
-
 def generate_advanced_mask_hsv(original_image: np.ndarray, verbose: bool = False) -> Union[np.ndarray, None]:
     """
     修改版：适用于白色背景图像中物体的分割，返回 0/1 二值掩码（无最大连通域筛选）。
@@ -387,8 +263,7 @@ class StableDiffusion(nn.Module):
         # 添加TensorBoard writer
         self.writer = SummaryWriter(log_dir=guidance_opt.tensorboard_log_dir if hasattr(guidance_opt, 'tensorboard_log_dir') else './runs/sd_training_new')
 
-        model_key = "/root/LucidDreamer/stable-diffusion-2-1-base"
-        assert model_key is not None
+        model_key = guidance_opt.model_key
 
         is_safe_tensor = guidance_opt.is_safe_tensor
         base_model_key = "stabilityai/stable-diffusion-v1-5" if guidance_opt.base_model_key is None else guidance_opt.base_model_key # for finetuned model only
@@ -466,61 +341,6 @@ class StableDiffusion(nn.Module):
         
 
         print(f'[INFO] loaded stable diffusion!')
-
-        # ==================== MASKING SETUP ====================
-        # self.use_subject_mask = use_subject_mask
-        # self.mask_strategy = mask_strategy
-        # self.mask_on_subject = mask_on_subject
-        # self.subject_mask_generator = None
-        # self.mask_cache = {}  # 缓存: { image_index: latent_mask_tensor }
-
-        # if self.use_subject_mask:
-        #     print("[SD Init] Masking is enabled. Initializing SubjectMaskGenerator.")
-        #     self.subject_mask_generator = SubjectMaskGenerator(
-        #         self.device,
-        #         sam_checkpoint_path=sam_checkpoint_path
-        #     )
-        #     # 检查SAM是否成功加载
-        #     if self.subject_mask_generator.mask_generator is None:
-        #         print("[SD Init] WARN: SAM model failed to load. Disabling subject masking for this run.")
-        #         self.use_subject_mask = False
-        #     else:
-        #         # 从 guidance_opt 获取图像尺寸，用于计算 latent 尺寸
-        #         H = getattr(guidance_opt, 'H', 512)
-        #         W = getattr(guidance_opt, 'W', 512)
-        #         self.latent_height = H // 8
-        #         self.latent_width = W // 8
-        #         print(f"[SD Init] Masking configured for latent space of size ({self.latent_height}, {self.latent_width}).")
-        #         print(f"[SD Init] Masking strategy: '{self.mask_strategy}'. Mask on subject: {self.mask_on_subject}.")
-
-        # print(f'[INFO] Stable Diffusion class initialized.')
-
-        # self.use_subject_mask = use_subject_mask
-        # self.mask_strategy = mask_strategy
-        # self.mask_on_subject = mask_on_subject
-        # self.subject_mask_generator = None
-        # self.mask_cache = {}  # 缓存: { image_index: latent_mask_tensor }
-
-        # if self.use_subject_mask:
-        #     print("[SD Init] Masking is enabled. Initializing SubjectMaskGenerator with FastSAM.")
-        #     self.subject_mask_generator = SubjectMaskGenerator(
-        #         self.device,
-        #         fastsam_checkpoint_path="/root/LucidDreamer/FastSAM/FastSAM.pt"
-        #     )
-        #     # 检查FastSAM是否成功加载
-        #     if self.subject_mask_generator.mask_generator is None:
-        #         print("[SD Init] WARN: FastSAM model failed to load. Disabling subject masking for this run.")
-        #         self.use_subject_mask = False
-        #     else:
-        #         # 从 guidance_opt 获取图像尺寸，用于计算 latent 尺寸
-        #         H = getattr(guidance_opt, 'H', 512)
-        #         W = getattr(guidance_opt, 'W', 512)
-        #         self.latent_height = H // 8
-        #         self.latent_width = W // 8
-        #         print(f"[SD Init] FastSAM masking configured for latent space of size ({self.latent_height}, {self.latent_width}).")
-        #         print(f"[SD Init] Masking strategy: '{self.mask_strategy}'. Mask on subject: {self.mask_on_subject}.")
-
-        # print(f'[INFO] Stable Diffusion class initialized with FastSAM masking.')
 
         # ==================== 蒙版设置 (修改后) ====================
         self.use_subject_mask = use_subject_mask
@@ -661,109 +481,6 @@ class StableDiffusion(nn.Module):
 
         return ind_t, current_guidance_scale, current_loss_weight, phase
 
-
-    # def _get_or_generate_latent_mask(self, image_tensor, image_index=None): # image_index 现在是可选的
-    #     """
-    #     内部辅助方法：根据输入的图像张量，生成并返回一个latent空间的掩码。
-    #     (已移除缓存逻辑，以确保每次都为新图像生成新掩码)
-    #     """
-    #     # 动态计算目标 latent 尺寸
-    #     # image_tensor 的形状是 [C, H, W]
-    #     target_height, target_width = image_tensor.shape[1], image_tensor.shape[2]
-    #     latent_height = target_height // 8
-    #     latent_width = target_width // 8
-
-    #     print(f"[Masking] Generating a new mask for image of size ({target_height}, {target_width}) -> latent size ({latent_height}, {latent_width})...")
-        
-    #     # 1. 转换Tensor为NumPy数组
-    #     image_np_uint8 = (image_tensor.permute(1, 2, 0).detach().cpu().numpy() * 255).astype(np.uint8)
-        
-    #     # 2. 生成全分辨率掩码
-    #     full_res_mask_np = self.subject_mask_generator.generate_mask_from_np(
-    #         image_np_uint8, strategy=self.mask_strategy)
-        
-    #     # 3. 处理生成失败
-    #     if full_res_mask_np is None:
-    #         print(f"[Masking] WARN: Mask generation FAILED. Using a passthrough (all ones) mask.")
-    #         latent_mask = torch.ones((1, 1, latent_height, latent_width), device=self.device, dtype=self.precision_t)
-    #         return latent_mask
-
-    #     # 4. 转换回Tensor并降采样到正确的 latent 尺寸
-    #     mask_tensor = torch.from_numpy(full_res_mask_np).to(self.device).float().unsqueeze(0).unsqueeze(0)
-    #     latent_mask = F.interpolate(mask_tensor, size=(latent_height, latent_width), mode='nearest-exact')
-
-    #     # 5. 处理掩码反转
-    #     if not self.mask_on_subject:
-    #         latent_mask = 1.0 - latent_mask
-
-    #     # 6. 直接返回，不存入缓存
-    #     return latent_mask.to(self.precision_t)
-
-    # def _get_or_generate_latent_mask(self, image_tensor, image_index=None, **mask_kwargs):
-    #     """
-    #     内部辅助方法：根据输入的图像张量，生成并返回一个latent空间的掩码。
-    #     使用FastSAM进行掩码生成
-        
-    #     Args:
-    #         image_tensor: 输入图像张量 [C, H, W]
-    #         image_index: 图像索引（可选）
-    #         **mask_kwargs: 传递给FastSAM的额外参数
-    #     """
-    #     # 动态计算目标 latent 尺寸
-    #     # image_tensor 的形状是 [C, H, W]
-    #     target_height, target_width = image_tensor.shape[1], image_tensor.shape[2]
-    #     latent_height = target_height // 8
-    #     latent_width = target_width // 8
-
-    #     print(f"[FastSAM Masking] Generating a new mask for image of size ({target_height}, {target_width}) -> latent size ({latent_height}, {latent_width})...")
-        
-    #     # 1. 转换Tensor为NumPy数组
-    #     image_np_uint8 = (image_tensor.permute(1, 2, 0).detach().cpu().numpy() * 255).astype(np.uint8)
-        
-    #     # 2. 准备FastSAM参数
-    #     fastsam_params = {
-    #         'strategy': self.mask_strategy,
-    #         'imgsz': mask_kwargs.get('imgsz', 1024),
-    #         'conf': mask_kwargs.get('conf', 0.4),
-    #         'iou': mask_kwargs.get('iou', 0.9),
-    #         'retina': mask_kwargs.get('retina', True)
-    #     }
-        
-    #     # 添加特定提示参数
-    #     if 'text_prompt' in mask_kwargs:
-    #         fastsam_params['text_prompt'] = mask_kwargs['text_prompt']
-    #     if 'point_prompt' in mask_kwargs:
-    #         fastsam_params['point_prompt'] = mask_kwargs['point_prompt']
-    #         fastsam_params['point_label'] = mask_kwargs.get('point_label', [1])
-    #     if 'box_prompt' in mask_kwargs:
-    #         fastsam_params['box_prompt'] = mask_kwargs['box_prompt']
-        
-    #     # 3. 生成全分辨率掩码
-    #     full_res_mask_np = self.subject_mask_generator.generate_mask_from_np(
-    #         image_np_uint8, **fastsam_params)
-        
-    #     # 4. 处理生成失败
-    #     if full_res_mask_np is None:
-    #         print(f"[FastSAM Masking] WARN: Mask generation FAILED. Using a passthrough (all ones) mask.")
-    #         latent_mask = torch.ones((1, 1, latent_height, latent_width), device=self.device, dtype=self.precision_t)
-    #         return latent_mask
-
-    #     # # ==================== 关键修改点 ====================
-    #     # # 根据您的观察，生成的掩码是主体为0，背景为1。
-    #     # # 为了修正这个问题，我们在这里将其反转，以确保后续步骤处理的掩码是 主体为1，背景为0。
-    #     # full_res_mask_np = 1 - full_res_mask_np
-    #     # # =====================================================
-
-    #     # 5. 转换回Tensor并降采样到正确的 latent 尺寸
-    #     mask_tensor = torch.from_numpy(full_res_mask_np).to(self.device).float().unsqueeze(0).unsqueeze(0)
-    #     latent_mask = F.interpolate(mask_tensor, size=(latent_height, latent_width), mode='nearest-exact')
-
-    #     # 6. 处理掩码反转
-    #     if not self.mask_on_subject:
-    #         latent_mask = 1.0 - latent_mask
-
-    #     # 7. 直接返回，不存入缓存
-    #     return latent_mask.to(self.precision_t)
 
     def _get_or_generate_latent_mask(self, image_tensor, image_index=None, **mask_kwargs):
         """
@@ -998,53 +715,6 @@ class StableDiffusion(nn.Module):
         else:
             current_delta_t =  guidance_opt.delta_t
 
-        # ind_t = torch.randint(self.min_step, self.max_step + int(self.warmup_step*warm_up_rate), (1, ), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
-
-        # if iteration < opt.warmup_iter:  # 阶段一：warmup阶段，随机采样
-        #     ind_t = torch.randint(self.min_step, self.max_step + int(self.warmup_step*warm_up_rate), (1, ), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
-        # else:  # 阶段二：线性递减采样
-        #     decay_range = self.max_step - self.min_step + 1
-        #     weights = torch.linspace(1.0, 0.1, decay_range, device=self.device)  # 高 -> 低 权重
-        #     weights = weights / weights.sum()
-        #     sampled_index = torch.multinomial(weights, 1, replacement=True)[0]
-        #     ind_t = sampled_index + self.min_step
-
-        # if iteration < opt.warmup_iter:
-        #     # 阶段一：随机采样
-        #     ind_t = torch.randint(self.min_step, self.max_step + int(self.warmup_step*warm_up_rate), (1, ), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
-        # else:
-        #     # 阶段二：线性递减采样
-        #     decay_iter = iteration - opt.warmup_iter
-        #     decay_total = opt.iterations - opt.warmup_iter
-
-        #     # 计算一个线性插值比例（从1到0）
-        #     decay_ratio = 1.0 - (decay_iter / decay_total)
-            
-        #     # 根据比例计算 ind_t
-        #     ind_t_f = self.min_step + decay_ratio * (self.max_step - self.min_step)
-        #     ind_t = int(ind_t_f)
-        #     ind_t = torch.tensor(ind_t, dtype=torch.long, device='cuda')
-
-        # if iteration < opt.warmup_iter:
-        #     # 阶段一：随机采样
-        #     ind_t = torch.randint(self.min_step, self.max_step + int(self.warmup_step*warm_up_rate), (1, ), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
-        # else:
-        #     # 阶段二：线性递减采样，但保持在25-35范围
-        #     decay_iter = iteration - opt.warmup_iter
-        #     decay_total = opt.iterations - opt.warmup_iter
-            
-        #     # 计算线性插值比例（从1到0）
-        #     decay_ratio = 1.0 - (decay_iter / decay_total)
-            
-        #     # 设置最小时间步阈值（例如25）
-        #     min_final_step = 25
-        #     max_final_step = 35
-            
-        #     # 根据比例计算 ind_t，但限制在 [min_final_step, self.max_step] 范围内
-        #     ind_t_f = max(min_final_step, self.min_step + decay_ratio * (self.max_step - self.min_step))
-        #     ind_t = int(ind_t_f)
-        #     ind_t = torch.tensor(ind_t, dtype=torch.long, device='cuda')
-
         if self.use_dhg_latent_hypergraph and self.dhg_latent_hypergraph is not None:
             if iteration < opt.warmup_iter:
                 # 阶段一：warmup期间，在[min_step, max_step + warmup部分]之间随机采样
@@ -1063,30 +733,6 @@ class StableDiffusion(nn.Module):
                 ind_t = torch.randint(self.min_step, current_max_step + 1, (1,), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
         else:
             ind_t = torch.randint(self.min_step, self.max_step + int(self.warmup_step*warm_up_rate), (1, ), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
-
-        # if iteration < opt.warmup_iter:
-        #     # 阶段一：warmup期间，在[min_step, max_step + warmup部分]之间随机采样
-        #     upper_bound = self.max_step + int(self.warmup_step * warm_up_rate)
-        #     ind_t = torch.randint(self.min_step, upper_bound + 1, (1,), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
-        # else:
-        #     # 阶段二：线性递减最大采样步数范围，在[min_step, 当前最大值]之间随机采样
-        #     decay_iter = iteration - opt.warmup_iter
-        #     decay_total = opt.iterations - opt.warmup_iter
-
-        #     # 计算当前最大值（线性递减）
-        #     current_max_step = int(self.min_step + (1.0 - decay_iter / decay_total) * (self.max_step - self.min_step))
-        #     current_max_step = max(self.min_step, current_max_step)
-
-        #     # 在[min_step, 当前最大值]之间随机采样
-        #     ind_t = torch.randint(self.min_step, current_max_step + 1, (1,), dtype=torch.long, generator=self.noise_gen, device=self.device)[0]
-
-        # ind_t = self.get_biased_time_step(warm_up_rate)
-        # ind_t = self.get_curriculum_timestep(iteration, warm_up_rate)
-        # ind_t, current_guidance_scale, current_loss_weight, current_phase = self.get_annealed_params(iteration)
-
-        # min_final_step = 25
-        # ind_prev_t_raw = ind_t - current_delta_t
-        # ind_prev_t = torch.clamp(ind_prev_t_raw, min=min_final_step)
 
         ind_prev_t = max(ind_t - current_delta_t, torch.ones_like(ind_t) * 0)
 

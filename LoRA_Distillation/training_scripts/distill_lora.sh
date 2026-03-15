@@ -16,7 +16,7 @@ echo ""
 
 # 设置环境变量
 # export CUDA_VISIBLE_DEVICES=3
-export PYTHONPATH="/root/lora:$PYTHONPATH"
+export PYTHONPATH="$(cd "$(dirname "$0")/../.."; pwd):$PYTHONPATH"
 
 # 训练配置
 LORA_MODELS_DIR="/root/lora_weight_before_distill/distill_weight8"
@@ -47,7 +47,7 @@ find "$LORA_MODELS_DIR" -name "*.safetensors" -o -name "*.pt" -o -name "*.pth" -
 echo ""
 
 # 运行多teacher蒸馏训练
-python /root/ForgeDreamer_FX/ForgeDreamer/LoRA_Distillation/lora_diffusion/distill_multi_lora_pic_good_result4.py \
+python "$(dirname "$0")/../lora_diffusion/distill_lora.py" \
   --lora_models_dir="$LORA_MODELS_DIR" \
   --pretrained_model_name_or_path="$BASE_MODEL" \
   --output_dir="$OUTPUT_DIR" \

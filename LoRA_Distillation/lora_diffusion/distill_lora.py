@@ -35,12 +35,12 @@ import sys
 from torchvision.utils import save_image
 from diffusers import StableDiffusionPipeline, EulerAncestralDiscreteScheduler
 from torch.utils.tensorboard import SummaryWriter
-from feature_hook_unet1 import FeatureAlignmentLoss, UNetFeatureExtractor, create_enhanced_feature_alignment_loss, create_hybrid_unet_alignment_loss
-from feature_hook_text_encoder1 import TextEncoderFeatureExtractor, TextEncoderFeatureAlignmentLoss, create_hybrid_text_encoder_alignment_loss
+from feature_hook_unet import FeatureAlignmentLoss, UNetFeatureExtractor, create_enhanced_feature_alignment_loss, create_hybrid_unet_alignment_loss
+from feature_hook_text_encoder import TextEncoderFeatureExtractor, TextEncoderFeatureAlignmentLoss, create_hybrid_text_encoder_alignment_loss
 from dynamic_weight import create_inversion_weight_adjuster, create_tuning_weight_adjuster
 import warnings
 
-sys.path.append('/root/lora')
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../..'))
 from lora_diffusion import (
     PivotalTuningDatasetCapation,
     PivotalTuningDatasetCapationPromptOnly,
@@ -818,7 +818,7 @@ def train_inversion_with_multi_feature_alignment(
     }
 
     # 🔥 创建混合UNet特征对齐损失函数
-    from feature_hook_unet1 import create_hybrid_unet_alignment_loss
+    from feature_hook_unet import create_hybrid_unet_alignment_loss
     
     unet_feature_alignment_loss_fn = create_hybrid_unet_alignment_loss(
         alignment_layers=unet_alignment_layers_for_loss,
@@ -865,7 +865,7 @@ def train_inversion_with_multi_feature_alignment(
     )
 
     # 🔥 Text Encoder混合特征对齐损失函数
-    from feature_hook_text_encoder1 import create_hybrid_text_encoder_alignment_loss
+    from feature_hook_text_encoder import create_hybrid_text_encoder_alignment_loss
     
     text_encoder_feature_alignment_loss_fn = create_hybrid_text_encoder_alignment_loss(
         alignment_layers=text_encoder_alignment_layers,
@@ -1593,7 +1593,7 @@ def perform_tuning_multi_teacher(
     layer_weights_for_loss = {k: v for k, v in layer_weights_for_loss.items() if k in alignment_layers_for_loss}
 
     # 🔥 创建混合UNet特征对齐损失函数
-    from feature_hook_unet1 import create_hybrid_unet_alignment_loss
+    from feature_hook_unet import create_hybrid_unet_alignment_loss
     
     unet_feature_alignment_loss_fn = create_hybrid_unet_alignment_loss(
         alignment_layers=alignment_layers_for_loss,
@@ -1615,7 +1615,7 @@ def perform_tuning_multi_teacher(
         print(f"   - 次损失: {unet_secondary_loss_type} ({100*unet_loss_combination_weight:.1f}%)")
 
     # 🔥 Text Encoder混合特征对齐
-    from feature_hook_text_encoder1 import (
+    from feature_hook_text_encoder import (
         TextEncoderFeatureExtractor, 
         create_hybrid_text_encoder_alignment_loss
     )
@@ -1645,7 +1645,7 @@ def perform_tuning_multi_teacher(
         print(f"   - 次损失: {text_encoder_secondary_loss_type} ({100*text_encoder_loss_combination_weight:.1f}%)")
 
     # 为每个teacher创建UNet特征提取器
-    from feature_hook_unet1 import UNetFeatureExtractor
+    from feature_hook_unet import UNetFeatureExtractor
     
     teacher_extractors = []
     for i, teacher_unet in enumerate(teacher_unets):
