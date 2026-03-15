@@ -17,6 +17,14 @@ from typing import Union
 import cv2
 import numpy as np
 import torch
+
+# 强制关闭 PyTorch 原生的 FlashAttention 和 MemEfficientAttention
+torch.backends.cuda.enable_flash_sdp(False)
+torch.backends.cuda.enable_mem_efficient_sdp(False)
+
+# 强制开启最原始、最精确的 Math 计算模式 (对应旧环境的隐式回退)
+torch.backends.cuda.enable_math_sdp(True)
+
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.transforms as T
@@ -430,6 +438,10 @@ class StableDiffusion(nn.Module):
         self.tokenizer = pipe.tokenizer
         self.text_encoder = pipe.text_encoder
         self.unet = pipe.unet
+
+        # --- 新增以下代码，强制回退到基础 Attention 处理器 ---
+        from diffusers.models.attention_processor import AttnProcessor
+        self.unet.set_attn_processor(AttnProcessor())
         
         self.num_train_timesteps = num_train_timesteps if num_train_timesteps is not None else self.scheduler.config.num_train_timesteps        
         self.scheduler.set_timesteps(self.num_train_timesteps, device=device)
