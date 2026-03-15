@@ -7,21 +7,21 @@ from collections import defaultdict
 class TextEncoderFeatureExtractor:
     def __init__(self, target_layers, mixed_precision_config=None):
         """
-        初始化 TextEncoderFeatureExtractor.
+        Initialize TextEncoderFeatureExtractor.
         Args:
-            target_layers (list of str): 需要提取特征的目标层名称列表。
-                例如: ['text_model.encoder.layers.0', 'text_model.encoder.layers.6', 'text_model.encoder.layers.11']
-            mixed_precision_config (str or object, optional): 混合精度配置。
-                可以是 "fp16", "bf16", "no"，或者一个 Accelerate 的 accelerator 对象，
-                或者任何具有 'mixed_precision' 属性的对象。
+            target_layers (list of str): List of target layer names from which to extract features.
+                e.g.: ['text_model.encoder.layers.0', 'text_model.encoder.layers.6', 'text_model.encoder.layers.11']
+            mixed_precision_config (str or object, optional): Mixed precision configuration.
+                Can be "fp16", "bf16", "no", or an Accelerate accelerator object,
+                or any object with a 'mixed_precision' attribute.
         """
         if not isinstance(target_layers, list):
             raise ValueError(f"target_layers should be a list of layer names, got {type(target_layers)}")
         self.target_layers = target_layers
-        self.features = {}  # 用于存储提取到的特征
-        self.hooks = []     # 用于存储注册的hook句柄
+        self.features = {}  # Stores extracted features
+        self.hooks = []     # Stores registered hook handles
 
-        # 根据 mixed_precision_config 设置 self.mixed_precision_active
+        # Set self.mixed_precision_active based on mixed_precision_config
         self.mixed_precision_active = False
         if isinstance(mixed_precision_config, str):
             self.mixed_precision_active = (mixed_precision_config.lower() in ["fp16", "bf16"])
@@ -31,31 +31,31 @@ class TextEncoderFeatureExtractor:
 
     def _hook_fn(self, module, input_tuple, output, layer_name):
         """
-        实际的hook函数，当被hook的层执行完毕后被调用。
-        对于CLIP Text Encoder，输出通常是hidden_states张量或包含多个元素的元组。
+        The actual hook function, called after the hooked layer completes its forward pass.
+        For CLIP Text Encoder, the output is typically a hidden_states tensor or a tuple with multiple elements.
         """
         feature_to_store = output
         
-        # 处理可能的元组输出
+        # Handle possible tuple output
         if isinstance(output, tuple):
-            # CLIP的transformer层通常返回 (hidden_states, attention_weights) 或类似结构
+            # CLIP transformer layers typically return (hidden_states, attention_weights) or similar
             if len(output) > 0 and isinstance(output[0], torch.Tensor):
-                feature_to_store = output[0]  # 通常第一个元素是hidden_states
+                feature_to_store = output[0]  # Usually the first element is hidden_states
             else:
-                # 如果元组为空或第一个元素不是张量，保持原样
+                # If the tuple is empty or the first element is not a tensor, keep as is
                 pass
         
-        # 对于CLIP，我们主要关心hidden_states，通常是形状为 (batch_size, seq_len, hidden_size) 的张量
+        # For CLIP, we mainly care about hidden_states, typically a tensor of shape (batch_size, seq_len, hidden_size)
         self.features[layer_name] = feature_to_store
 
     def register_hooks(self, text_encoder):
         """
-        在指定Text Encoder的目标层上注册forward hooks。
+        Register forward hooks on target layers of the specified Text Encoder.
         Args:
-            text_encoder (torch.nn.Module): 需要注册hooks的CLIP Text Encoder模型。
+            text_encoder (torch.nn.Module): The CLIP Text Encoder model on which to register hooks.
         """
-        self.clear_hooks()  # 先清除可能存在的旧hooks
-        self.features.clear()  # 清除之前提取的特征
+        self.clear_hooks()  # Clear any existing hooks first
+        self.features.clear()  # Clear previously extracted features
 
         if not self.target_layers:
             return
@@ -69,15 +69,15 @@ class TextEncoderFeatureExtractor:
 
     def get_features(self):
         """
-        获取所有通过hooks捕获到的特征。
+        Get all features captured through hooks.
         Returns:
-            dict: 一个字典，键是层名称，值是对应的特征张量。
+            dict: A dictionary with layer names as keys and corresponding feature tensors as values.
         """
-        return {k: v for k, v in self.features.items()}  # 返回一个副本
+        return {k: v for k, v in self.features.items()}  # Return a copy
 
     def clear_hooks(self):
         """
-        移除所有已注册的hooks并清空列表。
+        Remove all registered hooks and clear the list.
         """
         for hook in self.hooks:
             hook.remove()
@@ -91,25 +91,25 @@ class TextEncoderFeatureExtractor:
                          output_attentions: bool = False,
                          output_hidden_states: bool = False,
                          return_dict: bool = True,
-                         use_grad: bool = False,  # 新增：控制是否在 grad 上下文中运行
+                         use_grad: bool = False,  # New: controls whether to run in grad context
                          **other_text_encoder_kwargs):
         """
-        执行CLIP Text Encoder的前向传播并提取指定层的中间特征。
+        Run the CLIP Text Encoder forward pass and extract intermediate features from specified layers.
         Args:
-            text_encoder: CLIP Text Encoder模型
-            input_ids: 输入的token ids，形状为 (batch_size, seq_len)
-            attention_mask: 注意力掩码，形状为 (batch_size, seq_len)
-            position_ids: 位置编码ids
-            output_attentions: 是否输出注意力权重
-            output_hidden_states: 是否输出所有隐藏状态
-            return_dict: 是否返回字典格式
-            use_grad: 如果为 True，则在 torch.enable_grad() 上下文中运行，
-                     允许为学生模型提取可微分的特征。默认为 False
+            text_encoder: CLIP Text Encoder model
+            input_ids: Input token ids of shape (batch_size, seq_len)
+            attention_mask: Attention mask of shape (batch_size, seq_len)
+            position_ids: Position encoding ids
+            output_attentions: Whether to output attention weights
+            output_hidden_states: Whether to output all hidden states
+            return_dict: Whether to return dict format
+            use_grad: If True, run within torch.enable_grad() context,
+                     allowing differentiable feature extraction for the student model. Default is False
         """
-        # 1. 注册hooks
+        # 1. Register hooks
         self.register_hooks(text_encoder)
 
-        # 2. 确定Text Encoder的实际参数数据类型
+        # 2. Determine the actual parameter dtype of the Text Encoder
         try:
             encoder_internal_dtype = next(text_encoder.parameters()).dtype
         except StopIteration:
@@ -118,13 +118,13 @@ class TextEncoderFeatureExtractor:
             except StopIteration:
                 encoder_internal_dtype = input_ids.dtype if hasattr(input_ids, 'dtype') else torch.float32
 
-        # 3. 准备输入张量
-        # input_ids通常是long类型，不需要类型转换
+        # 3. Prepare input tensors
+        # input_ids are usually long type; no dtype conversion needed
         input_input_ids = input_ids
         input_attention_mask = attention_mask
         input_position_ids = position_ids
         
-        # 如果有其他浮点型输入，需要转换类型
+        # If there are other float-type inputs, convert their dtype
         if attention_mask is not None and attention_mask.dtype != input_ids.dtype:
             if attention_mask.dtype.is_floating_point:
                 input_attention_mask = attention_mask.to(dtype=encoder_internal_dtype)
@@ -133,13 +133,13 @@ class TextEncoderFeatureExtractor:
             if position_ids.dtype.is_floating_point:
                 input_position_ids = position_ids.to(dtype=encoder_internal_dtype)
 
-        # 4. 执行前向传播
+        # 4. Run forward pass
         main_output = None
-        # 根据 use_grad 选择上下文
+        # Choose context based on use_grad
         context_manager = torch.enable_grad() if use_grad else torch.no_grad()
 
         with context_manager:
-            # autocast 仅在 CUDA 上且 mixed_precision_active 为 True 时启用
+            # autocast is only enabled on CUDA when mixed_precision_active is True
             autocast_enabled = self.mixed_precision_active and text_encoder.device.type == 'cuda'
             with torch.cuda.amp.autocast(enabled=autocast_enabled):
                 output_data = text_encoder(
@@ -152,15 +152,15 @@ class TextEncoderFeatureExtractor:
                     **other_text_encoder_kwargs
                 )
 
-                # 5. 从Text Encoder的输出中获取主要特征
+                # 5. Get the main feature from the Text Encoder output
                 if return_dict:
-                    # CLIP Text Encoder通常返回包含last_hidden_state的对象
+                    # CLIP Text Encoder typically returns an object containing last_hidden_state
                     if hasattr(output_data, "last_hidden_state"):
                         main_output = output_data.last_hidden_state
                     elif hasattr(output_data, "pooler_output"):
                         main_output = output_data.pooler_output
                     else:
-                        # 尝试获取第一个可用的张量属性
+                        # Try to get the first available tensor attribute
                         for attr_name in dir(output_data):
                             attr_value = getattr(output_data, attr_name)
                             if isinstance(attr_value, torch.Tensor):
@@ -173,10 +173,10 @@ class TextEncoderFeatureExtractor:
                 else:
                     main_output = output_data
         
-        # 6. 获取通过hooks捕获的特征
+        # 6. Get features captured through hooks
         intermediate_features = self.get_features()
 
-        # 7. 清除hooks
+        # 7. Clear hooks
         self.clear_hooks()
 
         return main_output, intermediate_features
@@ -190,43 +190,43 @@ class TextEncoderFeatureExtractor:
 
 class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
     """
-    🔥 支持混合损失的Text Encoder特征对齐损失模块
+    🔥 Text Encoder feature alignment loss module with mixed loss support
     """
     def __init__(self, alignment_layers: List[str], 
                  loss_weights: Dict[str, float] = None,
                  temperature: float = 1.0, 
                  loss_type: str = "hybrid",
                  pooling_strategy: str = "mean",
-                 # 🔥 混合损失新增参数
+                 # 🔥 New parameters for mixed loss
                  primary_loss_type: str = "mse",
                  secondary_loss_type: str = "cosine", 
                  loss_combination_weight: float = 0.3,
                  enable_magnitude_preservation: bool = True,
                  magnitude_weight: float = 0.2,
                  direction_weight: float = 0.8,
-                 # 🔥 层级自适应参数
+                 # 🔥 Layer-adaptive parameters
                  use_layer_adaptive: bool = False,
                  layer_loss_config: Dict[str, Dict] = None):
         """
-        初始化混合Text Encoder特征对齐损失模块。
+        Initialize the mixed Text Encoder feature alignment loss module.
         Args:
-            alignment_layers (List[str]): 需要对齐特征的层名称列表。
-            loss_weights (Dict[str, float], optional): 每层损失的权重。
-            temperature (float): 用于缩放特征的温度。
-            loss_type (str): 损失类型 - "mse", "l1", "cosine", "hybrid", "scale_aware_cosine", "layer_adaptive"
-            pooling_strategy (str): 特征池化策略。
+            alignment_layers (List[str]): List of layer names whose features should be aligned.
+            loss_weights (Dict[str, float], optional): Per-layer loss weights.
+            temperature (float): Temperature used for scaling features.
+            loss_type (str): Loss type - "mse", "l1", "cosine", "hybrid", "scale_aware_cosine", "layer_adaptive"
+            pooling_strategy (str): Feature pooling strategy.
             
-            # 混合损失参数
-            primary_loss_type (str): 主损失类型 (通常是"mse")
-            secondary_loss_type (str): 次损失类型 (通常是"cosine")
-            loss_combination_weight (float): 次损失在混合中的权重 (0.3表示30%cosine + 70%mse)
-            enable_magnitude_preservation (bool): 是否启用幅度保持
-            magnitude_weight (float): 幅度损失权重
-            direction_weight (float): 方向损失权重
+            # Mixed loss parameters
+            primary_loss_type (str): Primary loss type (usually "mse")
+            secondary_loss_type (str): Secondary loss type (usually "cosine")
+            loss_combination_weight (float): Weight of secondary loss in the mixture (0.3 means 30% cosine + 70% mse)
+            enable_magnitude_preservation (bool): Whether to enable magnitude preservation
+            magnitude_weight (float): Magnitude loss weight
+            direction_weight (float): Direction loss weight
             
-            # 层级自适应参数
-            use_layer_adaptive (bool): 是否使用层级自适应损失
-            layer_loss_config (Dict): 每层的损失配置
+            # Layer-adaptive parameters
+            use_layer_adaptive (bool): Whether to use layer-adaptive loss
+            layer_loss_config (Dict): Per-layer loss configuration
         """
         super().__init__()
         self.alignment_layers = alignment_layers
@@ -235,7 +235,7 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
         self.pooling_strategy = pooling_strategy
         self.loss_type = loss_type.lower()
         
-        # 🔥 混合损失参数
+        # 🔥 Mixed loss parameters
         self.primary_loss_type = primary_loss_type.lower()
         self.secondary_loss_type = secondary_loss_type.lower()
         self.loss_combination_weight = loss_combination_weight
@@ -243,11 +243,11 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
         self.magnitude_weight = magnitude_weight
         self.direction_weight = direction_weight
         
-        # 🔥 层级自适应参数
+        # 🔥 Layer-adaptive parameters
         self.use_layer_adaptive = use_layer_adaptive
         self.layer_loss_config = layer_loss_config or self._get_default_layer_config()
         
-        # 初始化基础损失函数
+        # Initialize base loss functions
         self.mse_criterion = nn.MSELoss(reduction="mean")
         self.l1_criterion = nn.L1Loss(reduction="mean")
         self.cosine_criterion = nn.CosineEmbeddingLoss(reduction="mean")
@@ -264,7 +264,7 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
             print(f"   - Using layer-adaptive loss configuration")
     
     def _get_default_layer_config(self):
-        """获取默认的层级损失配置"""
+        """Get the default layer-level loss configuration."""
         return {
             'text_model.encoder.layers.0': {'type': 'mse', 'weight': 1.0},
             'text_model.encoder.layers.1': {'type': 'mse', 'weight': 1.0},
@@ -282,33 +282,33 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
 
     def _pool_text_features(self, features: torch.Tensor, attention_mask: torch.Tensor = None):
         """
-        对文本特征进行池化。
+        Pool text features.
         Args:
-            features: 形状为 (batch_size, seq_len, hidden_size) 的特征张量
-            attention_mask: 注意力掩码，形状为 (batch_size, seq_len)
+            features: Feature tensor of shape (batch_size, seq_len, hidden_size)
+            attention_mask: Attention mask of shape (batch_size, seq_len)
         Returns:
-            池化后的特征张量
+            Pooled feature tensor
         """
         if self.pooling_strategy == "none":
             return features
         elif self.pooling_strategy == "cls":
-            # 使用CLS token (第一个token)
+            # Use CLS token (first token)
             return features[:, 0, :]  # (batch_size, hidden_size)
         elif self.pooling_strategy == "mean":
             if attention_mask is not None:
-                # 使用attention mask进行加权平均
+                # Use attention mask for weighted average
                 mask_expanded = attention_mask.unsqueeze(-1).expand(features.size()).float()
                 sum_features = torch.sum(features * mask_expanded, dim=1)
                 sum_mask = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
                 return sum_features / sum_mask
             else:
-                # 简单平均
+                # Simple average
                 return torch.mean(features, dim=1)
         elif self.pooling_strategy == "max":
             if attention_mask is not None:
-                # 使用attention mask进行max pooling
+                # Use attention mask for max pooling
                 mask_expanded = attention_mask.unsqueeze(-1).expand(features.size()).float()
-                features_masked = features * mask_expanded + (1 - mask_expanded) * (-1e9)  # 将padding位置设为很小的值
+                features_masked = features * mask_expanded + (1 - mask_expanded) * (-1e9)  # Set padding positions to a very small value
                 return torch.max(features_masked, dim=1)[0]
             else:
                 return torch.max(features, dim=1)[0]
@@ -317,13 +317,13 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
 
     def _compute_single_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor, 
                            loss_type: str) -> torch.Tensor:
-        """计算单一类型的损失"""
+        """Compute a single loss type."""
         if loss_type == "mse":
             return self.mse_criterion(student_feat, teacher_feat)
         elif loss_type == "l1":
             return self.l1_criterion(student_feat, teacher_feat)
         elif loss_type == "cosine":
-            # 余弦相似度损失
+            # Cosine similarity loss
             target = torch.ones(student_feat.size(0), device=student_feat.device)
             return self.cosine_criterion(student_feat, teacher_feat, target)
         else:
@@ -331,14 +331,14 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
 
     def _compute_hybrid_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor,
                            layer_name: str) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """🔥 计算混合损失"""
-        # 主损失 (通常是MSE)
+        """🔥 Compute mixed loss."""
+        # Primary loss (usually MSE)
         primary_loss = self._compute_single_loss(student_feat, teacher_feat, self.primary_loss_type)
         
-        # 次损失 (通常是Cosine)
+        # Secondary loss (usually Cosine)
         secondary_loss = self._compute_single_loss(student_feat, teacher_feat, self.secondary_loss_type)
         
-        # 混合损失
+        # Mixed loss
         total_loss = (1 - self.loss_combination_weight) * primary_loss + \
                      self.loss_combination_weight * secondary_loss
         
@@ -352,23 +352,23 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
 
     def _compute_scale_aware_cosine_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor,
                                        layer_name: str) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """🔥 计算尺度感知的余弦损失"""
-        # 展平特征以便计算
+        """🔥 Compute scale-aware cosine loss."""
+        # Flatten features for computation
         batch_size = student_feat.size(0)
         student_flat = student_feat.view(batch_size, -1)
         teacher_flat = teacher_feat.view(batch_size, -1)
         
-        # 1. 方向损失 (余弦相似度)
+        # 1. Direction loss (cosine similarity)
         student_norm = F.normalize(student_flat, p=2, dim=1)
         teacher_norm = F.normalize(teacher_flat, p=2, dim=1)
         direction_loss = 1 - F.cosine_similarity(student_norm, teacher_norm, dim=1).mean()
         
-        # 2. 幅度损失 (L2范数差异)
+        # 2. Magnitude loss (L2 norm difference)
         student_magnitude = torch.norm(student_flat, p=2, dim=1)
         teacher_magnitude = torch.norm(teacher_flat, p=2, dim=1)
         magnitude_loss = F.mse_loss(student_magnitude, teacher_magnitude)
         
-        # 3. 混合损失
+        # 3. Mixed loss
         total_loss = self.direction_weight * direction_loss + \
                      self.magnitude_weight * magnitude_loss
         
@@ -382,23 +382,23 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
 
     def _compute_layer_adaptive_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor,
                                    layer_name: str) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """🔥 计算层级自适应损失"""
+        """🔥 Compute layer-adaptive loss."""
         config = self.layer_loss_config.get(layer_name, {'type': 'mse', 'weight': 1.0})
         loss_type = config['type']
         layer_weight = config['weight']
         
         if loss_type == 'hybrid':
-            # 使用混合损失
+            # Use mixed loss
             loss, loss_details = self._compute_hybrid_loss(student_feat, teacher_feat, layer_name)
         elif loss_type == 'scale_aware_cosine':
-            # 使用尺度感知余弦损失
+            # Use scale-aware cosine loss
             loss, loss_details = self._compute_scale_aware_cosine_loss(student_feat, teacher_feat, layer_name)
         else:
-            # 使用单一损失
+            # Use single loss
             loss = self._compute_single_loss(student_feat, teacher_feat, loss_type)
             loss_details = {f'{layer_name}_{loss_type}': loss.item()}
         
-        # 应用层级权重
+        # Apply layer-level weight
         weighted_loss = loss * layer_weight
         loss_details[f'{layer_name}_layer_weight'] = layer_weight
         loss_details[f'{layer_name}_weighted_total'] = weighted_loss.item()
@@ -407,7 +407,7 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
 
     def _compute_layer_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor,
                           layer_name: str) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """🔥 根据配置计算层损失"""
+        """🔥 Compute layer loss according to configuration."""
         if self.loss_type == "hybrid":
             return self._compute_hybrid_loss(student_feat, teacher_feat, layer_name)
         elif self.loss_type == "scale_aware_cosine":
@@ -415,7 +415,7 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
         elif self.loss_type == "layer_adaptive":
             return self._compute_layer_adaptive_loss(student_feat, teacher_feat, layer_name)
         else:
-            # 单一损失类型
+            # Single loss type
             loss = self._compute_single_loss(student_feat, teacher_feat, self.loss_type)
             loss_details = {f'{layer_name}_{self.loss_type}': loss.item()}
             return loss, loss_details
@@ -425,9 +425,9 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
                                 attention_mask1: torch.Tensor = None,
                                 attention_mask2: torch.Tensor = None):
         """
-        自适应地对齐两个特征张量。
+        Adaptively align two feature tensors.
         """
-        # 处理可能的元组输出
+        # Handle possible tuple output
         if isinstance(feat1, tuple):
             if len(feat1) > 0 and isinstance(feat1[0], torch.Tensor):
                 feat1 = feat1[0]
@@ -443,13 +443,13 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
         if not isinstance(feat1, torch.Tensor) or not isinstance(feat2, torch.Tensor):
             raise TypeError(f"Features must be tensors. Got feat1: {type(feat1)}, feat2: {type(feat2)}")
 
-        # 对文本特征进行池化（如果需要）
+        # Pool text features (if needed)
         feat1_pooled = self._pool_text_features(feat1, attention_mask1)
         feat2_pooled = self._pool_text_features(feat2, attention_mask2)
 
-        # 确保维度匹配
+        # Ensure dimensions match
         if feat1_pooled.shape != feat2_pooled.shape:
-            # 如果hidden_size不同，可以考虑添加线性投影层，这里先简单处理
+            # If hidden_size differs, consider adding a linear projection layer; simplified here
             min_dim = min(feat1_pooled.size(-1), feat2_pooled.size(-1))
             feat1_pooled = feat1_pooled[..., :min_dim]
             feat2_pooled = feat2_pooled[..., :min_dim]
@@ -461,11 +461,11 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
                 teacher_attention_mask: torch.Tensor = None,
                 student_attention_mask: torch.Tensor = None):
         """
-        🔥 计算混合特征对齐损失。
+        🔥 Compute mixed feature alignment loss.
         """
         total_loss = torch.tensor(0.0, dtype=torch.float32)
         
-        # 将total_loss移动到特征所在的设备
+        # Move total_loss to the device of the features
         if teacher_features and isinstance(list(teacher_features.values())[0], torch.Tensor):
             total_loss = total_loss.to(list(teacher_features.values())[0].device)
         elif student_features and isinstance(list(student_features.values())[0], torch.Tensor):
@@ -500,28 +500,28 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
             if teacher_feat_processed is None or student_feat_processed is None:
                 continue
 
-            # 转换为float类型进行计算
+            # Convert to float for computation
             student_feat_for_loss = student_feat_processed.float()
             teacher_feat_for_loss = teacher_feat_processed.float()
             
-            # 应用温度缩放
+            # Apply temperature scaling
             if self.temperature != 1.0:
                 student_feat_for_loss = student_feat_for_loss / self.temperature
                 teacher_feat_for_loss = teacher_feat_for_loss / self.temperature
 
-            # 🔥 计算层损失 (支持混合损失)
+            # 🔥 Compute layer loss (supports mixed loss)
             layer_loss, layer_loss_details = self._compute_layer_loss(
                 student_feat_for_loss, teacher_feat_for_loss, layer_name
             )
             
-            # 应用全局层权重
+            # Apply global layer weight
             global_weight = self.loss_weights.get(layer_name, 1.0)
             weighted_layer_loss = global_weight * layer_loss
             
             total_loss += weighted_layer_loss
             loss_dict[layer_name] = weighted_layer_loss.item()
             
-            # 保存详细损失信息
+            # Save detailed loss info
             detailed_loss_info.update(layer_loss_details)
             detailed_loss_info[f'{layer_name}_global_weight'] = global_weight
             detailed_loss_info[f'{layer_name}_final_weighted'] = weighted_layer_loss.item()
@@ -531,7 +531,7 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
         if active_layers_count == 0:
             return torch.tensor(0.0, device=total_loss.device, dtype=torch.float32), loss_dict, detailed_loss_info
 
-        # 🔥 添加损失类型统计信息
+        # 🔥 Add loss type statistics
         detailed_loss_info['total_loss'] = total_loss.item()
         detailed_loss_info['active_layers'] = active_layers_count
         detailed_loss_info['loss_type'] = self.loss_type
@@ -539,22 +539,22 @@ class HybridTextEncoderFeatureAlignmentLoss(nn.Module):
         return total_loss, loss_dict, detailed_loss_info
 
 
-# 🔥 保持向后兼容性的原始类（简单包装）
+# 🔥 Original class kept for backward compatibility (simple wrapper)
 class TextEncoderFeatureAlignmentLoss(HybridTextEncoderFeatureAlignmentLoss):
-    """原始的TextEncoderFeatureAlignmentLoss，现在继承自混合版本以保持向后兼容"""
+    """Original TextEncoderFeatureAlignmentLoss, now inherits from mixed version for backward compatibility."""
     def __init__(self, alignment_layers: List[str], loss_weights: Dict[str, float] = None, 
                  temperature: float = 1.0, loss_type: str = "mse", pooling_strategy: str = "mean"):
-        # 🔥 调用混合版本的初始化，但使用单一损失配置
+        # 🔥 Call mixed version initializer with single-loss configuration
         super().__init__(
             alignment_layers=alignment_layers,
             loss_weights=loss_weights,
             temperature=temperature,
             loss_type=loss_type,
             pooling_strategy=pooling_strategy,
-            # 保持原始行为的默认参数
+            # Default params to preserve original behavior
             primary_loss_type="mse",
             secondary_loss_type="cosine",
-            loss_combination_weight=0.0,  # 不使用混合
+            loss_combination_weight=0.0,  # Do not use mixing
             enable_magnitude_preservation=False,
             use_layer_adaptive=False
         )
@@ -563,11 +563,11 @@ class TextEncoderFeatureAlignmentLoss(HybridTextEncoderFeatureAlignmentLoss):
                 student_features: Dict[str, torch.Tensor],
                 teacher_attention_mask: torch.Tensor = None,
                 student_attention_mask: torch.Tensor = None):
-        """保持原始返回格式的前向传播"""
+        """Forward pass preserving original return format."""
         total_loss, loss_dict, detailed_loss_info = super().forward(
             teacher_features, student_features, teacher_attention_mask, student_attention_mask
         )
-        # 只返回原始格式的前两个值
+        # Return only the first two values in original format
         return total_loss, loss_dict
 
 
@@ -584,10 +584,10 @@ def compute_text_encoder_distillation_loss(
     use_grad_for_student=True
 ):
     """
-    🔥 改进的Text Encoder蒸馏损失计算，支持混合特征对齐损失。
+    🔥 Improved Text Encoder distillation loss computation with mixed feature alignment loss support.
     """
     
-    # Teacher 1 前向传播 (no grad)
+    # Teacher 1 forward pass (no grad)
     with torch.no_grad():
         if text_feature_extractor is not None:
             teacher1_output, teacher1_features = text_feature_extractor.extract_features(
@@ -597,7 +597,7 @@ def compute_text_encoder_distillation_loss(
             teacher1_output = teacher1_text_encoder(input_ids, attention_mask=attention_mask)
             teacher1_features = {}
     
-    # Teacher 2 前向传播 (no grad)
+    # Teacher 2 forward pass (no grad)
     with torch.no_grad():
         if text_feature_extractor is not None:
             teacher2_output, teacher2_features = text_feature_extractor.extract_features(
@@ -607,7 +607,7 @@ def compute_text_encoder_distillation_loss(
             teacher2_output = teacher2_text_encoder(input_ids, attention_mask=attention_mask)
             teacher2_features = {}
     
-    # Student 前向传播
+    # Student forward pass
     if text_feature_extractor is not None:
         student_output, student_features = text_feature_extractor.extract_features(
             student_text_encoder, input_ids, attention_mask, use_grad=use_grad_for_student
@@ -616,7 +616,7 @@ def compute_text_encoder_distillation_loss(
         student_output = student_text_encoder(input_ids, attention_mask=attention_mask)
         student_features = {}
     
-    # 获取文本嵌入 (通常是last_hidden_state或pooler_output)
+    # Get text embeddings (usually last_hidden_state or pooler_output)
     if hasattr(teacher1_output, 'last_hidden_state'):
         teacher1_embeddings = teacher1_output.last_hidden_state
     elif hasattr(teacher1_output, 'pooler_output'):
@@ -638,26 +638,26 @@ def compute_text_encoder_distillation_loss(
     else:
         student_embeddings = student_output
     
-    # 计算文本嵌入损失
-    target_embeddings = (teacher1_embeddings + teacher2_embeddings) / 2  # 平均两个teacher的输出
+    # Compute text embedding loss
+    target_embeddings = (teacher1_embeddings + teacher2_embeddings) / 2  # Average the two teacher outputs
     embedding_loss = F.mse_loss(student_embeddings, target_embeddings)
     
-    # 🔥 计算混合特征对齐损失
+    # 🔥 Compute mixed feature alignment loss
     total_feature_loss = torch.tensor(0.0, device=embedding_loss.device)
     feature_loss_dict = {}
     detailed_feature_info = {}
     
     if feature_alignment_loss_fn is not None and (teacher1_features or teacher2_features):
-        # 与teacher1的特征对齐
+        # Align features with teacher1
         if teacher1_features:
             if hasattr(feature_alignment_loss_fn, 'forward') and len(inspect.signature(feature_alignment_loss_fn.forward).parameters) > 4:
-                # 新的混合损失函数，返回3个值
+                # New mixed loss function, returns 3 values
                 feature_loss1, feature_loss_dict1, detailed_info1 = feature_alignment_loss_fn(
                     teacher1_features, student_features, attention_mask, attention_mask
                 )
                 detailed_feature_info.update({f"t1_{k}": v for k, v in detailed_info1.items()})
             else:
-                # 旧的损失函数，返回2个值
+                # Old loss function, returns 2 values
                 feature_loss1, feature_loss_dict1 = feature_alignment_loss_fn(
                     teacher1_features, student_features, attention_mask, attention_mask
                 )
@@ -665,16 +665,16 @@ def compute_text_encoder_distillation_loss(
             total_feature_loss += feature_loss1
             feature_loss_dict.update({f"t1_{k}": v for k, v in feature_loss_dict1.items()})
         
-        # 与teacher2的特征对齐
+        # Align features with teacher2
         if teacher2_features:
             if hasattr(feature_alignment_loss_fn, 'forward') and len(inspect.signature(feature_alignment_loss_fn.forward).parameters) > 4:
-                # 新的混合损失函数，返回3个值
+                # New mixed loss function, returns 3 values
                 feature_loss2, feature_loss_dict2, detailed_info2 = feature_alignment_loss_fn(
                     teacher2_features, student_features, attention_mask, attention_mask
                 )
                 detailed_feature_info.update({f"t2_{k}": v for k, v in detailed_info2.items()})
             else:
-                # 旧的损失函数，返回2个值
+                # Old loss function, returns 2 values
                 feature_loss2, feature_loss_dict2 = feature_alignment_loss_fn(
                     teacher2_features, student_features, attention_mask, attention_mask
                 )
@@ -682,11 +682,11 @@ def compute_text_encoder_distillation_loss(
             total_feature_loss += feature_loss2
             feature_loss_dict.update({f"t2_{k}": v for k, v in feature_loss_dict2.items()})
         
-        # 如果两个teacher都有特征，取平均
+        # If both teachers have features, take average
         if teacher1_features and teacher2_features:
             total_feature_loss = total_feature_loss / 2
     
-    # 总损失
+    # Total loss
     total_loss = (
         embedding_weight * embedding_loss + 
         feature_align_weight * total_feature_loss
@@ -699,31 +699,31 @@ def compute_text_encoder_distillation_loss(
         **feature_loss_dict
     }
     
-    # 🔥 如果有详细信息，也加入返回
+    # 🔥 Include detailed info in return if available
     if detailed_feature_info:
         loss_dict.update(detailed_feature_info)
     
     return total_loss, loss_dict
 
 
-# 🔥 便捷的创建函数
+# 🔥 Convenience creation function
 def create_hybrid_text_encoder_alignment_loss(alignment_layers: List[str],
                                              loss_type: str = "hybrid",
                                              loss_weights: Dict[str, float] = None,
                                              **kwargs) -> HybridTextEncoderFeatureAlignmentLoss:
     """
-    便捷创建混合文本编码器特征对齐损失的函数
+    Convenience function for creating a mixed text encoder feature alignment loss.
     
     Args:
-        alignment_layers: 对齐层列表
-        loss_type: 损失类型 - "mse", "cosine", "hybrid", "scale_aware_cosine", "layer_adaptive"
-        loss_weights: 层权重字典
-        **kwargs: 其他参数
+        alignment_layers: List of alignment layers
+        loss_type: Loss type - "mse", "cosine", "hybrid", "scale_aware_cosine", "layer_adaptive"
+        loss_weights: Dict of layer weights
+        **kwargs: Additional arguments
     
-    推荐配置:
-    1. 标准混合损失: loss_type="hybrid", primary_loss_type="mse", secondary_loss_type="cosine", loss_combination_weight=0.3
-    2. 尺度感知: loss_type="scale_aware_cosine", direction_weight=0.8, magnitude_weight=0.2
-    3. 层级自适应: loss_type="layer_adaptive", use_layer_adaptive=True
+    Recommended configurations:
+    1. Standard mixed loss: loss_type="hybrid", primary_loss_type="mse", secondary_loss_type="cosine", loss_combination_weight=0.3
+    2. Scale-aware: loss_type="scale_aware_cosine", direction_weight=0.8, magnitude_weight=0.2
+    3. Layer-adaptive: loss_type="layer_adaptive", use_layer_adaptive=True
     """
     return HybridTextEncoderFeatureAlignmentLoss(
         alignment_layers=alignment_layers,
@@ -733,10 +733,10 @@ def create_hybrid_text_encoder_alignment_loss(alignment_layers: List[str],
     )
 
 
-# 🔥 使用示例和推荐配置
+# 🔥 Usage examples and recommended configurations
 def example_hybrid_usage():
     """
-    混合损失使用示例
+    Mixed loss usage examples
     """
     target_layers = [
         'text_model.encoder.layers.0',
@@ -748,12 +748,12 @@ def example_hybrid_usage():
         'text_model.encoder.layers.11'
     ]
     
-    # 🔥 方案1: 混合损失 (推荐)
+    # 🔥 Option 1: Mixed loss (recommended)
     hybrid_loss = create_hybrid_text_encoder_alignment_loss(
         alignment_layers=target_layers,
         loss_type="hybrid",
-        primary_loss_type="mse",           # 主损失保持尺度信息
-        secondary_loss_type="cosine",      # 次损失关注方向对齐
+        primary_loss_type="mse",           # Primary loss preserves scale information
+        secondary_loss_type="cosine",      # Secondary loss focuses on direction alignment
         loss_combination_weight=0.3,       # 30% cosine + 70% mse
         pooling_strategy="mean",
         loss_weights={
@@ -763,39 +763,39 @@ def example_hybrid_usage():
         }
     )
     
-    # 🔥 方案2: 尺度感知余弦损失
+    # 🔥 Option 2: Scale-aware cosine loss
     scale_aware_loss = create_hybrid_text_encoder_alignment_loss(
         alignment_layers=target_layers,
         loss_type="scale_aware_cosine",
-        direction_weight=0.8,              # 方向损失权重
-        magnitude_weight=0.2,              # 幅度损失权重
+        direction_weight=0.8,              # Direction loss weight
+        magnitude_weight=0.2,              # Magnitude loss weight
         pooling_strategy="mean"
     )
     
-    # 🔥 方案3: 层级自适应损失
+    # 🔥 Option 3: Layer-adaptive loss
     layer_adaptive_loss = create_hybrid_text_encoder_alignment_loss(
         alignment_layers=target_layers,
-        loss_type="layer_adaptive",        # 每层使用不同损失策略
+        loss_type="layer_adaptive",        # Each layer uses a different loss strategy
         use_layer_adaptive=True,
         pooling_strategy="mean"
     )
     
-    print("🔥 混合损失示例配置完成!")
-    print("方案1: 混合损失 - 平衡尺度和方向")
-    print("方案2: 尺度感知余弦 - 保持余弦优势同时考虑幅度")
-    print("方案3: 层级自适应 - 根据层特性选择最佳损失")
+    print("🔥 Mixed loss example configuration complete!")
+    print("Option 1: Mixed loss - balances scale and direction")
+    print("Option 2: Scale-aware cosine - preserves cosine advantage while considering magnitude")
+    print("Option 3: Layer-adaptive - selects the best loss based on layer characteristics")
     
     return hybrid_loss, scale_aware_loss, layer_adaptive_loss
 
 
 if __name__ == "__main__":
-    # 运行示例
+    # Run examples
     example_hybrid_usage()
     
-    # 测试向后兼容性
-    print("\n🔧 测试向后兼容性...")
+    # Test backward compatibility
+    print("\n🔧 Testing backward compatibility...")
     old_style_loss = TextEncoderFeatureAlignmentLoss(
         alignment_layers=['text_model.encoder.layers.0'],
         loss_type="mse"
     )
-    print("✅ 向后兼容性测试通过!")
+    print("✅ Backward compatibility test passed!")

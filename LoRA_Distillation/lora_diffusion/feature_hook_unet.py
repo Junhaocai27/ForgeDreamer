@@ -6,7 +6,7 @@ from collections import defaultdict
 import inspect
 
 class FeatureHook:
-    """用于捕获中间层特征的Hook类"""
+    """Hook class for capturing intermediate layer features."""
     def __init__(self):
         self.features = {}
         self.hooks = []
@@ -17,7 +17,7 @@ class FeatureHook:
         return fn
     
     def register_hooks(self, model, layer_names):
-        """为指定层注册hook"""
+        """Register a hook for the specified layer."""
         self.clear_hooks()
         for name, module in model.named_modules():
             if name in layer_names:
@@ -25,7 +25,7 @@ class FeatureHook:
                 self.hooks.append(hook)
     
     def clear_hooks(self):
-        """清除所有hook"""
+        """Clear all hooks."""
         for hook in self.hooks:
             hook.remove()
         self.hooks = []
@@ -37,20 +37,20 @@ class FeatureHook:
 class UNetFeatureExtractor:
     def __init__(self, target_layers, mixed_precision_config=None):
         """
-        初始化 UNetFeatureExtractor.
+        Initialize UNetFeatureExtractor.
         Args:
-            target_layers (list of str): 需要提取特征的目标层名称列表。
-            mixed_precision_config (str or object, optional): 混合精度配置。
-                可以是 "fp16", "bf16", "no"，或者一个 Accelerate 的 accelerator 对象，
-                或者任何具有 'mixed_precision' 属性的对象。
+            target_layers (list of str): List of target layer names from which to extract features.
+            mixed_precision_config (str or object, optional): Mixed precision configuration.
+                Can be "fp16", "bf16", "no", or an Accelerate accelerator object,
+                or any object with a 'mixed_precision' attribute.
         """
         if not isinstance(target_layers, list):
             raise ValueError(f"target_layers should be a list of layer names, got {type(target_layers)}")
         self.target_layers = target_layers
-        self.features = {}  # 用于存储提取到的特征
-        self.hooks = []     # 用于存储注册的hook句柄
+        self.features = {}  # Stores extracted features
+        self.hooks = []     # Stores registered hook handles
 
-        # 根据 mixed_precision_config 设置 self.mixed_precision_active
+        # Set self.mixed_precision_active based on mixed_precision_config
         self.mixed_precision_active = False
         if isinstance(mixed_precision_config, str):
             self.mixed_precision_active = (mixed_precision_config.lower() in ["fp16", "bf16"])
@@ -60,7 +60,7 @@ class UNetFeatureExtractor:
 
     def _hook_fn(self, module, input_tuple, output, layer_name):
         """
-        实际的hook函数，当被hook的层执行完毕后被调用。
+        The actual hook function, called after the hooked layer completes its forward pass.
         """
         feature_to_store = output
         if isinstance(output, tuple):
@@ -70,9 +70,9 @@ class UNetFeatureExtractor:
 
     def register_hooks(self, model):
         """
-        在指定模型的目标层上注册forward hooks。
+        Register forward hooks on target layers of the specified model.
         Args:
-            model (torch.nn.Module): 需要注册hooks的UNet模型。
+            model (torch.nn.Module): The UNet model on which to register hooks.
         """
         self.clear_hooks()
         self.features.clear()
@@ -89,15 +89,15 @@ class UNetFeatureExtractor:
 
     def get_features(self):
         """
-        获取所有通过hooks捕获到的特征。
+        Get all features captured through hooks.
         Returns:
-            dict: 一个字典，键是层名称，值是对应的特征张量。
+            dict: A dictionary with layer names as keys and corresponding feature tensors as values.
         """
         return {k: v for k, v in self.features.items()}
 
     def clear_hooks(self):
         """
-        移除所有已注册的hooks并清空列表。
+        Remove all registered hooks and clear the list.
         """
         for hook in self.hooks:
             hook.remove()
@@ -113,15 +113,15 @@ class UNetFeatureExtractor:
                          use_grad: bool = False,
                          **other_unet_specific_kwargs):
         """
-        执行UNet的前向传播并提取指定层的中间特征。
+        Run the UNet forward pass and extract intermediate features from specified layers.
         Args:
-            use_grad (bool): 如果为 True，则在 torch.enable_grad() 上下文中运行UNet，
-                             允许为学生模型提取可微分的特征。默认为 False (在 no_grad() 中运行)。
+            use_grad (bool): If True, run the UNet within torch.enable_grad() context,
+                             allowing differentiable feature extraction for the student model. Default is False (runs in no_grad()).
         """
-        # 1. 注册hooks
+        # 1. Register hooks
         self.register_hooks(unet_model)
 
-        # 2. 确定UNet的实际参数数据类型
+        # 2. Determine the actual parameter dtype of the UNet
         try:
             unet_internal_dtype = next(unet_model.parameters()).dtype
         except StopIteration:
@@ -130,7 +130,7 @@ class UNetFeatureExtractor:
             except StopIteration:
                 unet_internal_dtype = sample.dtype
 
-        # 3. 准备输入张量的数据类型
+        # 3. Prepare input tensor dtypes
         input_sample = sample.to(dtype=unet_internal_dtype)
         input_encoder_hidden_states = None
         if encoder_hidden_states is not None:
@@ -153,7 +153,7 @@ class UNetFeatureExtractor:
                 else:
                     processed_cross_attention_kwargs[key] = value
 
-        # 4. 执行前向传播
+        # 4. Run forward pass
         main_output = None
         context_manager = torch.enable_grad() if use_grad else torch.no_grad()
 
@@ -169,7 +169,7 @@ class UNetFeatureExtractor:
                     **other_unet_specific_kwargs
                 )
 
-                # 5. 从UNet的输出中获取主要的预测
+                # 5. Get the main prediction from the UNet output
                 if return_dict:
                     if not hasattr(output_data, "sample"):
                         raise ValueError("UNet returned a dictionary but it does not have a 'sample' attribute.")
@@ -179,10 +179,10 @@ class UNetFeatureExtractor:
                 else:
                     main_output = output_data
         
-        # 6. 获取通过hooks捕获的特征
+        # 6. Get features captured through hooks
         intermediate_features = self.get_features()
 
-        # 7. 清除hooks
+        # 7. Clear hooks
         self.clear_hooks()
 
         return main_output, intermediate_features
@@ -196,7 +196,7 @@ class UNetFeatureExtractor:
 
 class HybridUNetFeatureAlignmentLoss(nn.Module):
     """
-    🔥 支持混合损失的UNet特征对齐损失模块
+    🔥 UNet feature alignment loss module with mixed loss support
     """
     def __init__(self, 
                  alignment_layers: List[str], 
@@ -206,38 +206,38 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                  feature_selection_strategy: str = "adaptive",
                  normalize_features: bool = True,
                  channel_alignment: str = "projection",
-                 # 🔥 混合损失新增参数
+                 # 🔥 New parameters for mixed loss
                  primary_loss_type: str = "mse",
                  secondary_loss_type: str = "cosine", 
                  loss_combination_weight: float = 0.3,
                  enable_magnitude_preservation: bool = True,
                  magnitude_weight: float = 0.2,
                  direction_weight: float = 0.8,
-                 # 🔥 层级自适应参数
+                 # 🔥 Layer-adaptive parameters
                  use_layer_adaptive: bool = False,
                  layer_loss_config: Dict[str, Dict] = None):
         """
-        初始化混合UNet特征对齐损失模块。
+        Initialize the mixed UNet feature alignment loss module.
         Args:
-            alignment_layers (List[str]): 需要对齐特征的层名称列表。
-            loss_weights (Dict[str, float], optional): 每层损失的权重。
-            temperature (float): 用于缩放特征的温度。
-            loss_type (str): 损失类型 - "mse", "l1", "cosine", "hybrid", "scale_aware_cosine", "layer_adaptive"
-            feature_selection_strategy (str): 特征选择策略
-            normalize_features (bool): 是否归一化特征
-            channel_alignment (str): 通道对齐方式
+            alignment_layers (List[str]): List of layer names whose features should be aligned.
+            loss_weights (Dict[str, float], optional): Per-layer loss weights.
+            temperature (float): Temperature used for scaling features.
+            loss_type (str): Loss type - "mse", "l1", "cosine", "hybrid", "scale_aware_cosine", "layer_adaptive"
+            feature_selection_strategy (str): Feature selection strategy
+            normalize_features (bool): Whether to normalize features
+            channel_alignment (str): Channel alignment method
             
-            # 混合损失参数
-            primary_loss_type (str): 主损失类型 (通常是"mse")
-            secondary_loss_type (str): 次损失类型 (通常是"cosine")
-            loss_combination_weight (float): 次损失在混合中的权重 (0.3表示30%cosine + 70%mse)
-            enable_magnitude_preservation (bool): 是否启用幅度保持
-            magnitude_weight (float): 幅度损失权重
-            direction_weight (float): 方向损失权重
+            # Mixed loss parameters
+            primary_loss_type (str): Primary loss type (usually "mse")
+            secondary_loss_type (str): Secondary loss type (usually "cosine")
+            loss_combination_weight (float): Weight of secondary loss in the mixture (0.3 means 30% cosine + 70% mse)
+            enable_magnitude_preservation (bool): Whether to enable magnitude preservation
+            magnitude_weight (float): Magnitude loss weight
+            direction_weight (float): Direction loss weight
             
-            # 层级自适应参数
-            use_layer_adaptive (bool): 是否使用层级自适应损失
-            layer_loss_config (Dict): 每层的损失配置
+            # Layer-adaptive parameters
+            use_layer_adaptive (bool): Whether to use layer-adaptive loss
+            layer_loss_config (Dict): Per-layer loss configuration
         """
         super().__init__()
         self.alignment_layers = alignment_layers
@@ -248,7 +248,7 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
         self.normalize_features = normalize_features
         self.channel_alignment = channel_alignment
         
-        # 🔥 混合损失参数
+        # 🔥 Mixed loss parameters
         self.primary_loss_type = primary_loss_type.lower()
         self.secondary_loss_type = secondary_loss_type.lower()
         self.loss_combination_weight = loss_combination_weight
@@ -256,16 +256,16 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
         self.magnitude_weight = magnitude_weight
         self.direction_weight = direction_weight
         
-        # 🔥 层级自适应参数
+        # 🔥 Layer-adaptive parameters
         self.use_layer_adaptive = use_layer_adaptive
         self.layer_loss_config = layer_loss_config or self._get_default_layer_config()
         
-        # 初始化基础损失函数
+        # Initialize base loss functions
         self.mse_criterion = nn.MSELoss(reduction="mean")
         self.l1_criterion = nn.L1Loss(reduction="mean")
         self.cosine_criterion = nn.CosineEmbeddingLoss(reduction="mean")
         
-        # 用于通道对齐的投影层
+        # Projection layers for channel alignment
         self.channel_projectors = nn.ModuleDict()
         
         print(f"🔥 HybridUNetFeatureAlignmentLoss initialized:")
@@ -282,7 +282,7 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
             print(f"   - Using layer-adaptive loss configuration")
     
     def _get_default_layer_config(self):
-        """获取默认的层级损失配置"""
+        """Get the default layer-level loss configuration."""
         return {
             'conv_in': {'type': 'mse', 'weight': 0.8},
             'down_blocks.0': {'type': 'mse', 'weight': 1.0},
@@ -301,7 +301,7 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                                    feature: Union[torch.Tensor, Tuple], 
                                    layer_name: str) -> torch.Tensor:
         """
-        从元组中智能提取tensor特征
+        Intelligently extract tensor features from a tuple.
         """
         if isinstance(feature, torch.Tensor):
             return feature
@@ -319,30 +319,30 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
         elif self.feature_selection_strategy == "last":
             return tensors[-1]
         elif self.feature_selection_strategy == "adaptive":
-            # 选择具有最多信息的tensor（通常是最大的）
+            # Select the tensor with the most information (usually the largest)
             return max(tensors, key=lambda x: x.numel())
         elif self.feature_selection_strategy == "attention":
-            # 使用注意力权重组合多个tensor
+            # Use attention weights to combine multiple tensors
             return self._attention_combine_tensors(tensors, layer_name)
         else:
-            return tensors[0]  # 默认取第一个
+            return tensors[0]  # Default: take the first one
 
     def _attention_combine_tensors(self, 
                                    tensors: List[torch.Tensor], 
                                    layer_name: str) -> torch.Tensor:
         """
-        使用注意力机制组合多个tensor
+        Combine multiple tensors using an attention mechanism.
         """
         if len(tensors) == 1:
             return tensors[0]
         
-        # 将所有tensor reshape到相同的空间维度
+        # Reshape all tensors to the same spatial dimensions
         reference_shape = tensors[0].shape
         aligned_tensors = []
         
         for tensor in tensors:
             if tensor.shape != reference_shape:
-                # 简单的自适应池化对齐
+                # Simple adaptive pooling alignment
                 if tensor.ndim == 4:  # (B, C, H, W)
                     aligned = F.adaptive_avg_pool2d(tensor, reference_shape[2:])
                 elif tensor.ndim == 3:  # (B, L, D)
@@ -355,21 +355,21 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
             else:
                 aligned_tensors.append(tensor)
         
-        # 计算注意力权重
+        # Compute attention weights
         attention_weights = []
         for tensor in aligned_tensors:
-            # 使用tensor的方差作为重要性权重
+            # Use tensor variance as importance weight
             weight = torch.var(tensor, dim=list(range(1, tensor.ndim)), keepdim=True)
             attention_weights.append(weight.mean())
         
-        # 归一化权重
+        # Normalize weights
         total_weight = sum(attention_weights)
         if total_weight > 0:
             attention_weights = [w / total_weight for w in attention_weights]
         else:
             attention_weights = [1.0 / len(tensors)] * len(tensors)
         
-        # 加权组合
+        # Weighted combination
         combined = sum(w * t for w, t in zip(attention_weights, aligned_tensors))
         return combined
 
@@ -378,21 +378,21 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                                   student_feat: torch.Tensor, 
                                   layer_name: str) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        对齐通道维度
+        Align channel dimensions.
         """
         if teacher_feat.shape[1] == student_feat.shape[1]:
             return teacher_feat, student_feat
         
         if self.channel_alignment == "none":
-            # 截断到较小的通道数
+            # Truncate to the smaller channel count
             min_channels = min(teacher_feat.shape[1], student_feat.shape[1])
             return teacher_feat[:, :min_channels], student_feat[:, :min_channels]
         
         elif self.channel_alignment == "interpolation":
-            # 使用插值调整通道数
+            # Use interpolation to adjust channel count
             target_channels = teacher_feat.shape[1]
             if student_feat.shape[1] != target_channels:
-                # 通过1x1卷积调整通道数
+                # Adjust channel count via 1x1 convolution
                 projector_key = f"{layer_name}_conv"
                 if projector_key not in self.channel_projectors:
                     self.channel_projectors[projector_key] = nn.Conv2d(
@@ -402,14 +402,14 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                 if student_feat.ndim == 4:
                     student_feat = self.channel_projectors[projector_key](student_feat)
                 else:
-                    # 对于3D tensor，需要添加空间维度
+                    # For 3D tensors, spatial dimensions need to be added
                     original_shape = student_feat.shape
                     reshaped = student_feat.view(original_shape[0], original_shape[1], 1, -1)
                     projected = self.channel_projectors[projector_key](reshaped)
                     student_feat = projected.view(original_shape[0], target_channels, -1)
         
         elif self.channel_alignment == "projection":
-            # 使用线性投影对齐
+            # Use linear projection for alignment
             target_channels = teacher_feat.shape[1]
             if student_feat.shape[1] != target_channels:
                 projector_key = f"{layer_name}_proj"
@@ -418,7 +418,7 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                         student_feat.shape[1], target_channels, bias=False
                     ).to(student_feat.device)
                 
-                # 重塑和投影
+                # Reshape and project
                 original_shape = student_feat.shape
                 flattened = student_feat.view(-1, original_shape[1])
                 projected = self.channel_projectors[projector_key](flattened)
@@ -430,18 +430,18 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                                     teacher_feat: torch.Tensor, 
                                     student_feat: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        改进的空间维度对齐
+        Improved spatial dimension alignment.
         """
         if teacher_feat.shape[2:] == student_feat.shape[2:]:
             return teacher_feat, student_feat
         
-        # 对齐到teacher的空间维度
+        # Align to teacher's spatial dimensions
         target_shape = teacher_feat.shape[2:]
         
         if student_feat.ndim == 4:  # (B, C, H, W)
             student_feat_aligned = F.adaptive_avg_pool2d(student_feat, target_shape)
-        elif student_feat.ndim == 3:  # (B, L, D) 或 (B, D, L)
-            if len(target_shape) == 1:  # 序列长度对齐
+        elif student_feat.ndim == 3:  # (B, L, D) or (B, D, L)
+            if len(target_shape) == 1:  # Sequence length alignment
                 student_feat_permuted = student_feat.transpose(1, 2)
                 aligned_permuted = F.adaptive_avg_pool1d(student_feat_permuted, target_shape[0])
                 student_feat_aligned = aligned_permuted.transpose(1, 2)
@@ -456,12 +456,12 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                            teacher_feat: torch.Tensor, 
                            student_feat: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        特征归一化
+        Feature normalization.
         """
         if not self.normalize_features:
             return teacher_feat, student_feat
         
-        # L2归一化
+        # L2 normalization
         teacher_norm = F.normalize(teacher_feat, p=2, dim=1)
         student_norm = F.normalize(student_feat, p=2, dim=1)
         
@@ -469,16 +469,16 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
 
     def _compute_single_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor, 
                            loss_type: str) -> torch.Tensor:
-        """计算单一类型的损失"""
+        """Compute a single loss type."""
         if loss_type == "mse":
             return self.mse_criterion(student_feat, teacher_feat)
         elif loss_type == "l1":
             return self.l1_criterion(student_feat, teacher_feat)
         elif loss_type == "cosine":
-            # 余弦相似度损失
+            # Cosine similarity loss
             target = torch.ones(student_feat.size(0), device=student_feat.device)
             
-            # 展平特征
+            # Flatten features
             teacher_flat = teacher_feat.view(teacher_feat.shape[0], -1)
             student_flat = student_feat.view(student_feat.shape[0], -1)
             
@@ -488,14 +488,14 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
 
     def _compute_hybrid_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor,
                            layer_name: str) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """🔥 计算混合损失"""
-        # 主损失 (通常是MSE)
+        """🔥 Compute mixed loss."""
+        # Primary loss (usually MSE)
         primary_loss = self._compute_single_loss(student_feat, teacher_feat, self.primary_loss_type)
         
-        # 次损失 (通常是Cosine)
+        # Secondary loss (usually Cosine)
         secondary_loss = self._compute_single_loss(student_feat, teacher_feat, self.secondary_loss_type)
         
-        # 混合损失
+        # Mixed loss
         total_loss = (1 - self.loss_combination_weight) * primary_loss + \
                      self.loss_combination_weight * secondary_loss
         
@@ -509,23 +509,23 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
 
     def _compute_scale_aware_cosine_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor,
                                        layer_name: str) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """🔥 计算尺度感知的余弦损失"""
-        # 展平特征以便计算
+        """🔥 Compute scale-aware cosine loss."""
+        # Flatten features for computation
         batch_size = student_feat.size(0)
         student_flat = student_feat.view(batch_size, -1)
         teacher_flat = teacher_feat.view(batch_size, -1)
         
-        # 1. 方向损失 (余弦相似度)
+        # 1. Direction loss (cosine similarity)
         student_norm = F.normalize(student_flat, p=2, dim=1)
         teacher_norm = F.normalize(teacher_flat, p=2, dim=1)
         direction_loss = 1 - F.cosine_similarity(student_norm, teacher_norm, dim=1).mean()
         
-        # 2. 幅度损失 (L2范数差异)
+        # 2. Magnitude loss (L2 norm difference)
         student_magnitude = torch.norm(student_flat, p=2, dim=1)
         teacher_magnitude = torch.norm(teacher_flat, p=2, dim=1)
         magnitude_loss = F.mse_loss(student_magnitude, teacher_magnitude)
         
-        # 3. 混合损失
+        # 3. Mixed loss
         total_loss = self.direction_weight * direction_loss + \
                      self.magnitude_weight * magnitude_loss
         
@@ -539,23 +539,23 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
 
     def _compute_layer_adaptive_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor,
                                    layer_name: str) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """🔥 计算层级自适应损失"""
+        """�� Compute layer-adaptive loss."""
         config = self.layer_loss_config.get(layer_name, {'type': 'mse', 'weight': 1.0})
         loss_type = config['type']
         layer_weight = config['weight']
         
         if loss_type == 'hybrid':
-            # 使用混合损失
+            # Use mixed loss
             loss, loss_details = self._compute_hybrid_loss(student_feat, teacher_feat, layer_name)
         elif loss_type == 'scale_aware_cosine':
-            # 使用尺度感知余弦损失
+            # Use scale-aware cosine loss
             loss, loss_details = self._compute_scale_aware_cosine_loss(student_feat, teacher_feat, layer_name)
         else:
-            # 使用单一损失
+            # Use single loss
             loss = self._compute_single_loss(student_feat, teacher_feat, loss_type)
             loss_details = {f'{layer_name}_{loss_type}': loss.item()}
         
-        # 应用层级权重
+        # Apply layer-level weight
         weighted_loss = loss * layer_weight
         loss_details[f'{layer_name}_layer_weight'] = layer_weight
         loss_details[f'{layer_name}_weighted_total'] = weighted_loss.item()
@@ -564,12 +564,12 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
 
     def _compute_layer_loss(self, student_feat: torch.Tensor, teacher_feat: torch.Tensor,
                           layer_name: str) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """🔥 根据配置计算层损失"""
-        # 确保数据类型一致
+        """🔥 Compute layer loss according to configuration."""
+        # Ensure consistent data types
         teacher_feat = teacher_feat.float()
         student_feat = student_feat.float()
         
-        # 检查数值稳定性
+        # Check numerical stability
         if torch.isnan(teacher_feat).any() or torch.isnan(student_feat).any():
             print(f"Warning: NaN detected in features for layer {layer_name}")
             return torch.tensor(0.0, device=teacher_feat.device), {}
@@ -585,7 +585,7 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
         elif self.loss_type == "layer_adaptive":
             return self._compute_layer_adaptive_loss(student_feat, teacher_feat, layer_name)
         else:
-            # 单一损失类型
+            # Single loss type
             loss = self._compute_single_loss(student_feat, teacher_feat, self.loss_type)
             loss_details = {f'{layer_name}_{self.loss_type}': loss.item()}
             return loss, loss_details
@@ -593,9 +593,9 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
     def _adaptive_pool_features(self, feat1: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
                                   feat2: Union[torch.Tensor, Tuple[torch.Tensor, ...]]):
         """
-        自适应地对齐两个特征张量 (保持原有逻辑)
+        Adaptively align two feature tensors (preserving original logic).
         """
-        # 处理可能的元组输出
+        # Handle possible tuple output
         if isinstance(feat1, tuple):
             original_feat1_tuple = feat1
             found_tensor_in_feat1 = False
@@ -644,10 +644,10 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                 teacher_features: Dict[str, torch.Tensor], 
                 student_features: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, float], Dict[str, float]]:
         """
-        🔥 计算混合特征对齐损失
+        🔥 Compute mixed feature alignment loss.
         """
         device = None
-        # 确定设备
+        # Determine device
         for features in [teacher_features, student_features]:
             if features:
                 first_feat = next(iter(features.values()))
@@ -665,7 +665,7 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
         
         for layer_name in self.alignment_layers:
             try:
-                # 检查特征是否存在
+                # Check whether features exist
                 if (layer_name not in teacher_features or 
                     layer_name not in student_features or
                     teacher_features[layer_name] is None or 
@@ -680,7 +680,7 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                     print(f"Warning: Features for layer {layer_name} are not Tensors or Tuples. Skipping.")
                     continue
                 
-                # 使用原有的特征对齐逻辑
+                # Use original feature alignment logic
                 try:
                     teacher_feat_processed, student_feat_processed = self._adaptive_pool_features(
                         t_feat_orig, s_feat_orig
@@ -692,40 +692,40 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                 if teacher_feat_processed is None or student_feat_processed is None:
                     continue
 
-                # 🔥 应用增强的特征对齐流程
-                # 1. 通道维度对齐
+                # 🔥 Apply enhanced feature alignment pipeline
+                # 1. Channel dimension alignment
                 teacher_feat_processed, student_feat_processed = self._align_channel_dimensions(
                     teacher_feat_processed, student_feat_processed, layer_name
                 )
                 
-                # 2. 空间维度对齐
+                # 2. Spatial dimension alignment
                 teacher_feat_processed, student_feat_processed = self._adaptive_spatial_alignment(
                     teacher_feat_processed, student_feat_processed
                 )
                 
-                # 3. 特征归一化
+                # 3. Feature normalization
                 teacher_feat_processed, student_feat_processed = self._normalize_features(
                     teacher_feat_processed, student_feat_processed
                 )
                 
-                # 4. 应用温度缩放
+                # 4. Apply temperature scaling
                 if self.temperature != 1.0:
                     student_feat_processed = student_feat_processed / self.temperature
                     teacher_feat_processed = teacher_feat_processed / self.temperature
 
-                # 🔥 5. 计算混合层损失
+                # 🔥 5. Compute mixed layer loss
                 layer_loss, layer_loss_details = self._compute_layer_loss(
                     student_feat_processed, teacher_feat_processed, layer_name
                 )
                 
-                # 6. 应用全局层权重
+                # 6. Apply global layer weight
                 global_weight = self.loss_weights.get(layer_name, 1.0)
                 weighted_layer_loss = global_weight * layer_loss
                 
                 total_loss += weighted_layer_loss
                 loss_dict[layer_name] = weighted_layer_loss.item()
                 
-                # 保存详细损失信息
+                # Save detailed loss info
                 detailed_loss_info.update(layer_loss_details)
                 detailed_loss_info[f'{layer_name}_global_weight'] = global_weight
                 detailed_loss_info[f'{layer_name}_final_weighted'] = weighted_layer_loss.item()
@@ -736,12 +736,12 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
                 print(f"Error processing layer {layer_name}: {e}")
                 continue
         
-        # 处理没有活跃层的情况
+        # Handle the case where no active layers are present
         if active_layers_count == 0:
             print("Warning: No active layers for feature alignment loss calculation.")
             return torch.tensor(0.0, device=device, dtype=torch.float32, requires_grad=True), loss_dict, detailed_loss_info
         
-        # 🔥 添加损失类型统计信息
+        # 🔥 Add loss type statistics
         detailed_loss_info['total_loss'] = total_loss.item()
         detailed_loss_info['active_layers'] = active_layers_count
         detailed_loss_info['loss_type'] = self.loss_type
@@ -749,12 +749,12 @@ class HybridUNetFeatureAlignmentLoss(nn.Module):
         return total_loss, loss_dict, detailed_loss_info
 
 
-# 🔥 保持向后兼容性的原始类（简单包装）
+# �� Original classes kept for backward compatibility (simple wrappers)
 class FeatureAlignmentLoss(HybridUNetFeatureAlignmentLoss):
-    """原始的FeatureAlignmentLoss，现在继承自混合版本以保持向后兼容"""
+    """Original FeatureAlignmentLoss, now inherits from mixed version for backward compatibility."""
     def __init__(self, alignment_layers: List[str], loss_weights: Dict[str, float] = None, 
                  temperature: float = 1.0, loss_type: str = "mse"):
-        # 🔥 调用混合版本的初始化，但使用单一损失配置
+        # 🔥 Call mixed version initializer with single-loss configuration
         super().__init__(
             alignment_layers=alignment_layers,
             loss_weights=loss_weights,
@@ -763,26 +763,26 @@ class FeatureAlignmentLoss(HybridUNetFeatureAlignmentLoss):
             feature_selection_strategy="adaptive",
             normalize_features=True,
             channel_alignment="projection",
-            # 保持原始行为的默认参数
+            # Default params to preserve original behavior
             primary_loss_type="mse",
             secondary_loss_type="cosine",
-            loss_combination_weight=0.0,  # 不使用混合
+            loss_combination_weight=0.0,  # Do not use mixing
             enable_magnitude_preservation=False,
             use_layer_adaptive=False
         )
     
     def forward(self, teacher_features: Dict[str, torch.Tensor], 
                 student_features: Dict[str, torch.Tensor]):
-        """保持原始返回格式的前向传播"""
+        """Forward pass preserving original return format."""
         total_loss, loss_dict, detailed_loss_info = super().forward(
             teacher_features, student_features
         )
-        # 只返回原始格式的前两个值
+        # Return only the first two values in original format
         return total_loss, loss_dict
 
 
 class EnhancedFeatureAlignmentLoss(HybridUNetFeatureAlignmentLoss):
-    """增强的特征对齐损失，现在继承自混合版本"""
+    """Enhanced feature alignment loss, now inherits from mixed version."""
     def __init__(self, 
                  alignment_layers: List[str], 
                  loss_weights: Dict[str, float] = None, 
@@ -791,7 +791,7 @@ class EnhancedFeatureAlignmentLoss(HybridUNetFeatureAlignmentLoss):
                  feature_selection_strategy: str = "adaptive",
                  normalize_features: bool = True,
                  channel_alignment: str = "projection"):
-        # 调用混合版本的初始化
+        # Call mixed version initializer
         super().__init__(
             alignment_layers=alignment_layers,
             loss_weights=loss_weights,
@@ -800,7 +800,7 @@ class EnhancedFeatureAlignmentLoss(HybridUNetFeatureAlignmentLoss):
             feature_selection_strategy=feature_selection_strategy,
             normalize_features=normalize_features,
             channel_alignment=channel_alignment,
-            # 增强版本的默认混合参数
+            # Default mixed parameters for enhanced version
             primary_loss_type="mse",
             secondary_loss_type="cosine",
             loss_combination_weight=0.0 if loss_type != "hybrid" else 0.3,
@@ -810,44 +810,44 @@ class EnhancedFeatureAlignmentLoss(HybridUNetFeatureAlignmentLoss):
     
     def forward(self, teacher_features: Dict[str, torch.Tensor], 
                 student_features: Dict[str, torch.Tensor]):
-        """保持增强版本的返回格式"""
+        """Maintain the enhanced version return format."""
         total_loss, loss_dict, detailed_loss_info = super().forward(
             teacher_features, student_features
         )
-        # 返回前两个值以保持兼容性
+        # Return first two values to maintain compatibility
         return total_loss, loss_dict
 
 
 def modified_forward_with_features(unet, sample, timestep, encoder_hidden_states, **kwargs):
-    """修改后的UNet前向传播，同时返回中间特征"""
+    """Modified UNet forward pass that also returns intermediate features."""
     features = {}
     
-    # 原始的UNet前向传播逻辑，但在关键点保存特征
-    # 这里需要根据具体的UNet实现来修改
+    # Original UNet forward pass logic, but saves features at key points
+    # This needs to be adapted based on the specific UNet implementation
     
-    # 示例：假设我们可以访问UNet的内部结构
+    # Example: assuming we can access the internal UNet structure
     sample = unet.conv_in(sample)
     features['conv_in'] = sample.clone()
     
-    # 下采样
+    # Downsampling
     down_block_res_samples = []
     for i, downsample_block in enumerate(unet.down_blocks):
         sample, res_samples = downsample_block(sample, timestep, encoder_hidden_states)
         down_block_res_samples.extend(res_samples)
         features[f'down_blocks.{i}'] = sample.clone()
     
-    # 中间块
+    # Middle block
     sample = unet.mid_block(sample, timestep, encoder_hidden_states)
     features['mid_block'] = sample.clone()
     
-    # 上采样
+    # Upsampling
     for i, upsample_block in enumerate(unet.up_blocks):
         res_samples = down_block_res_samples[-len(upsample_block.resnets):]
         down_block_res_samples = down_block_res_samples[:-len(upsample_block.resnets)]
         sample = upsample_block(sample, res_samples, timestep, encoder_hidden_states)
         features[f'up_blocks.{i}'] = sample.clone()
     
-    # 输出
+    # Output
     sample = unet.conv_norm_out(sample)
     sample = unet.conv_act(sample)
     sample = unet.conv_out(sample)
@@ -868,45 +868,45 @@ def compute_distillation_loss_with_hybrid_features(
     noise_pred_weight=1.0,
     feature_align_weight=0.5
 ):
-    """🔥 计算包含混合特征对齐的蒸馏损失"""
+    """🔥 Compute distillation loss with mixed feature alignment."""
     
-    # Teacher 1 前向传播
+    # Teacher 1 forward pass
     with torch.no_grad():
         teacher1_noise_pred, teacher1_features = modified_forward_with_features(
             teacher1_unet, latents, timesteps, encoder_hidden_states1
         )
     
-    # Teacher 2 前向传播
+    # Teacher 2 forward pass
     with torch.no_grad():
         teacher2_noise_pred, teacher2_features = modified_forward_with_features(
             teacher2_unet, latents, timesteps, encoder_hidden_states2
         )
     
-    # Student 前向传播
+    # Student forward pass
     student_noise_pred, student_features = modified_forward_with_features(
         student_unet, latents, timesteps, encoder_hidden_states1
     )
     
-    # 计算噪声预测损失
+    # Compute noise prediction loss
     target_noise = (teacher1_noise_pred + teacher2_noise_pred) / 2
     noise_pred_loss = F.mse_loss(student_noise_pred, target_noise)
     
-    # 🔥 计算混合特征对齐损失
+    # 🔥 Compute mixed feature alignment loss
     total_feature_loss = torch.tensor(0.0, device=noise_pred_loss.device)
     feature_loss_dict = {}
     detailed_feature_info = {}
     
     if feature_alignment_loss_fn is not None and (teacher1_features or teacher2_features):
-        # 与teacher1的特征对齐
+        # Align features with teacher1
         if teacher1_features:
             if hasattr(feature_alignment_loss_fn, 'forward') and len(inspect.signature(feature_alignment_loss_fn.forward).parameters) > 4:
-                # 新的混合损失函数，返回3个值
+                # New mixed loss function, returns 3 values
                 feature_loss1, feature_loss_dict1, detailed_info1 = feature_alignment_loss_fn(
                     teacher1_features, student_features
                 )
                 detailed_feature_info.update({f"t1_{k}": v for k, v in detailed_info1.items()})
             else:
-                # 旧的损失函数，返回2个值
+                # Old loss function, returns 2 values
                 feature_loss1, feature_loss_dict1 = feature_alignment_loss_fn(
                     teacher1_features, student_features
                 )
@@ -914,16 +914,16 @@ def compute_distillation_loss_with_hybrid_features(
             total_feature_loss += feature_loss1
             feature_loss_dict.update({f"t1_{k}": v for k, v in feature_loss_dict1.items()})
         
-        # 与teacher2的特征对齐
+        # Align features with teacher2
         if teacher2_features:
             if hasattr(feature_alignment_loss_fn, 'forward') and len(inspect.signature(feature_alignment_loss_fn.forward).parameters) > 4:
-                # 新的混合损失函数，返回3个值
+                # New mixed loss function, returns 3 values
                 feature_loss2, feature_loss_dict2, detailed_info2 = feature_alignment_loss_fn(
                     teacher2_features, student_features
                 )
                 detailed_feature_info.update({f"t2_{k}": v for k, v in detailed_info2.items()})
             else:
-                # 旧的损失函数，返回2个值
+                # Old loss function, returns 2 values
                 feature_loss2, feature_loss_dict2 = feature_alignment_loss_fn(
                     teacher2_features, student_features
                 )
@@ -931,11 +931,11 @@ def compute_distillation_loss_with_hybrid_features(
             total_feature_loss += feature_loss2
             feature_loss_dict.update({f"t2_{k}": v for k, v in feature_loss_dict2.items()})
         
-        # 如果两个teacher都有特征，取平均
+        # If both teachers have features, take average
         if teacher1_features and teacher2_features:
             total_feature_loss = total_feature_loss / 2
     
-    # 总损失
+    # Total loss
     total_loss = (
         noise_pred_weight * noise_pred_loss + 
         feature_align_weight * total_feature_loss
@@ -948,31 +948,31 @@ def compute_distillation_loss_with_hybrid_features(
         **feature_loss_dict
     }
     
-    # 🔥 如果有详细信息，也加入返回
+    # 🔥 Include detailed info in return if available
     if detailed_feature_info:
         loss_dict.update(detailed_feature_info)
     
     return total_loss, loss_dict
 
 
-# 🔥 便捷的创建函数
+# 🔥 Convenience creation functions
 def create_hybrid_unet_alignment_loss(alignment_layers: List[str],
                                      loss_type: str = "hybrid",
                                      loss_weights: Dict[str, float] = None,
                                      **kwargs) -> HybridUNetFeatureAlignmentLoss:
     """
-    便捷创建混合UNet特征对齐损失的函数
+    Convenience function for creating a mixed UNet feature alignment loss.
     
     Args:
-        alignment_layers: 对齐层列表
-        loss_type: 损失类型 - "mse", "cosine", "hybrid", "scale_aware_cosine", "layer_adaptive"
-        loss_weights: 层权重字典
-        **kwargs: 其他参数
+        alignment_layers: List of alignment layers
+        loss_type: Loss type - "mse", "cosine", "hybrid", "scale_aware_cosine", "layer_adaptive"
+        loss_weights: Dict of layer weights
+        **kwargs: Additional arguments
     
-    推荐配置:
-    1. 标准混合损失: loss_type="hybrid", primary_loss_type="mse", secondary_loss_type="cosine", loss_combination_weight=0.3
-    2. 尺度感知: loss_type="scale_aware_cosine", direction_weight=0.8, magnitude_weight=0.2
-    3. 层级自适应: loss_type="layer_adaptive", use_layer_adaptive=True
+    Recommended configurations:
+    1. Standard mixed loss: loss_type="hybrid", primary_loss_type="mse", secondary_loss_type="cosine", loss_combination_weight=0.3
+    2. Scale-aware: loss_type="scale_aware_cosine", direction_weight=0.8, magnitude_weight=0.2
+    3. Layer-adaptive: loss_type="layer_adaptive", use_layer_adaptive=True
     """
     return HybridUNetFeatureAlignmentLoss(
         alignment_layers=alignment_layers,
@@ -988,7 +988,7 @@ def create_enhanced_feature_alignment_loss(
     **kwargs
 ) -> EnhancedFeatureAlignmentLoss:
     """
-    创建增强的特征对齐损失函数 (保持兼容性)
+    Create an enhanced feature alignment loss function (maintains compatibility).
     """
     default_kwargs = {
         'temperature': 1.0,
@@ -1006,10 +1006,10 @@ def create_enhanced_feature_alignment_loss(
     )
 
 
-# 🔥 使用示例和推荐配置
+# 🔥 Usage examples and recommended configurations
 def example_hybrid_unet_usage():
     """
-    混合UNet损失使用示例
+    Mixed UNet loss usage examples.
     """
     target_layers = [
         'conv_in',
@@ -1019,12 +1019,12 @@ def example_hybrid_unet_usage():
         'conv_out'
     ]
     
-    # 🔥 方案1: 混合损失 (推荐)
+    # 🔥 Option 1: Mixed loss (recommended)
     hybrid_loss = create_hybrid_unet_alignment_loss(
         alignment_layers=target_layers,
         loss_type="hybrid",
-        primary_loss_type="mse",           # 主损失保持尺度信息
-        secondary_loss_type="cosine",      # 次损失关注方向对齐
+        primary_loss_type="mse",           # Primary loss preserves scale information
+        secondary_loss_type="cosine",      # Secondary loss focuses on direction alignment
         loss_combination_weight=0.3,       # 30% cosine + 70% mse
         feature_selection_strategy="adaptive",
         normalize_features=True,
@@ -1040,43 +1040,43 @@ def example_hybrid_unet_usage():
         }
     )
     
-    # 🔥 方案2: 尺度感知余弦损失
+    # 🔥 Option 2: Scale-aware cosine loss
     scale_aware_loss = create_hybrid_unet_alignment_loss(
         alignment_layers=target_layers,
         loss_type="scale_aware_cosine",
-        direction_weight=0.8,              # 方向损失权重
-        magnitude_weight=0.2,              # 幅度损失权重
+        direction_weight=0.8,              # Direction loss weight
+        magnitude_weight=0.2,              # Magnitude loss weight
         feature_selection_strategy="adaptive",
         normalize_features=True,
         channel_alignment="projection"
     )
     
-    # 🔥 方案3: 层级自适应损失
+    # 🔥 Option 3: Layer-adaptive loss
     layer_adaptive_loss = create_hybrid_unet_alignment_loss(
         alignment_layers=target_layers,
-        loss_type="layer_adaptive",        # 每层使用不同损失策略
+        loss_type="layer_adaptive",        # Each layer uses a different loss strategy
         use_layer_adaptive=True,
         feature_selection_strategy="adaptive",
         normalize_features=True,
         channel_alignment="projection"
     )
     
-    print("🔥 混合UNet损失示例配置完成!")
-    print("方案1: 混合损失 - 平衡尺度和方向")
-    print("方案2: 尺度感知余弦 - 保持余弦优势同时考虑幅度")
-    print("方案3: 层级自适应 - 根据层特性选择最佳损失")
+    print("🔥 Mixed UNet loss example configuration complete!")
+    print("Option 1: Mixed loss - balances scale and direction")
+    print("Option 2: Scale-aware cosine - preserves cosine advantage while considering magnitude")
+    print("Option 3: Layer-adaptive - selects the best loss based on layer characteristics")
     
     return hybrid_loss, scale_aware_loss, layer_adaptive_loss
 
 
 if __name__ == "__main__":
-    # 运行示例
+    # Run examples
     example_hybrid_unet_usage()
     
-    # 测试向后兼容性
-    print("\n🔧 测试向后兼容性...")
+    # Test backward compatibility
+    print("\n🔧 Testing backward compatibility...")
     old_style_loss = FeatureAlignmentLoss(
         alignment_layers=['down_blocks.0'],
         loss_type="mse"
     )
-    print("✅ 向后兼容性测试通过!")
+    print("✅ Backward compatibility test passed!")
