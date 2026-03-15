@@ -2003,18 +2003,18 @@ def perform_tuning_multi_teacher(
             print(f"  • Learning Rate:             {current_lr:.2e}")
             print(f"  • Current Teacher:           Teacher {current_teacher_idx + 1}/{num_teachers}")
 
-            # 🔥 混合损失配置显示
-            print(f"\n🔥 混合损失配置摘要:")
-            print(f"  • UNet混合损失类型: {unet_feature_loss_type}")
+            # 🔥 Hybrid loss configuration display
+            print(f"\n🔥 Hybrid Loss Configuration Summary:")
+            print(f"  • UNet hybrid loss type: {unet_feature_loss_type}")
             if unet_feature_loss_type == "hybrid":
-                print(f"    - 主损失({unet_primary_loss_type}): {100*(1-unet_loss_combination_weight):.1f}%")
-                print(f"    - 次损失({unet_secondary_loss_type}): {100*unet_loss_combination_weight:.1f}%")
-            print(f"  • TextEncoder混合损失类型: {text_encoder_loss_type}")
+                print(f"    - Primary loss ({unet_primary_loss_type}): {100*(1-unet_loss_combination_weight):.1f}%")
+                print(f"    - Secondary loss ({unet_secondary_loss_type}): {100*unet_loss_combination_weight:.1f}%")
+            print(f"  • TextEncoder hybrid loss type: {text_encoder_loss_type}")
             if text_encoder_loss_type == "hybrid":
-                print(f"    - 主损失({text_encoder_primary_loss_type}): {100*(1-text_encoder_loss_combination_weight):.1f}%")
-                print(f"    - 次损失({text_encoder_secondary_loss_type}): {100*text_encoder_loss_combination_weight:.1f}%")
+                print(f"    - Primary loss ({text_encoder_primary_loss_type}): {100*(1-text_encoder_loss_combination_weight):.1f}%")
+                print(f"    - Secondary loss ({text_encoder_secondary_loss_type}): {100*text_encoder_loss_combination_weight:.1f}%")
 
-            # 交替优化统计
+            # Alternating optimization statistics
             if use_alternating_optimization:
                 noise_steps = sum(1 for i in range(max(0, global_step - step_count_in_interval), global_step) 
                                 if alt_controller.get_current_mode(i) == "noise")
@@ -2023,7 +2023,7 @@ def perform_tuning_multi_teacher(
                 print(f"    - Noise Steps:             {noise_steps} ({noise_steps/step_count_in_interval*100:.1f}%)")
                 print(f"    - Feature Steps:           {feature_steps} ({feature_steps/step_count_in_interval*100:.1f}%)")
 
-            # 🔥 Teacher混合损失统计
+            # 🔥 Teacher hybrid loss statistics
             print(f"\n📊 Teacher Mixed Loss Performance Summary:")
             for i, tracker in enumerate(teacher_loss_trackers):
                 teacher_name = f"Teacher {i+1}"
@@ -2036,22 +2036,22 @@ def perform_tuning_multi_teacher(
                     avg_total_loss_teacher = tracker['total_loss'] / step_count
                     teacher_usage_frequency = step_count / global_step
                     
-                    # 🔥 混合损失统计
+                    # 🔥 Hybrid loss statistics
                     avg_unet_primary = tracker['unet_primary_loss'] / step_count
                     avg_unet_secondary = tracker['unet_secondary_loss'] / step_count
                     avg_text_primary = tracker['text_primary_loss'] / step_count
                     avg_text_secondary = tracker['text_secondary_loss'] / step_count
                     
-                    print(f"  📊 {teacher_name} 混合损失统计:")
-                    print(f"    • 使用次数: {step_count}/{global_step} ({teacher_usage_frequency:.2%})")
-                    print(f"    • 平均噪声预测损失: {avg_noise_loss_teacher:.6f}")
-                    print(f"    • 🔥 UNet混合损失: 主={avg_unet_primary:.6f}, 次={avg_unet_secondary:.6f}")
-                    print(f"    • 🔥 Text混合损失: 主={avg_text_primary:.6f}, 次={avg_text_secondary:.6f}")
-                    print(f"    • 平均总损失: {avg_total_loss_teacher:.6f}")
+                    print(f"  📊 {teacher_name} Hybrid Loss Statistics:")
+                    print(f"    • Usage count: {step_count}/{global_step} ({teacher_usage_frequency:.2%})")
+                    print(f"    • Average noise prediction loss: {avg_noise_loss_teacher:.6f}")
+                    print(f"    • 🔥 UNet hybrid loss: primary={avg_unet_primary:.6f}, secondary={avg_unet_secondary:.6f}")
+                    print(f"    • 🔥 Text hybrid loss: primary={avg_text_primary:.6f}, secondary={avg_text_secondary:.6f}")
+                    print(f"    • Average total loss: {avg_total_loss_teacher:.6f}")
                 else:
-                    print(f"  📊 {teacher_name}: 未使用")
+                    print(f"  📊 {teacher_name}: Not used")
 
-            # 保存模型
+            # Save model
             current_save_dir = os.path.join(save_path, out_name)
             if not os.path.exists(current_save_dir):
                 os.makedirs(current_save_dir, exist_ok=True)
@@ -2068,7 +2068,7 @@ def perform_tuning_multi_teacher(
             )
             print(f"✓ Multi-Teacher Hybrid LoRA Checkpoint saved to: {checkpoint_path}\n")
 
-            # 重置累积损失
+            # Reset accumulated losses
             accumulated_total_loss = 0.0
             accumulated_noise_loss = 0.0
             accumulated_unet_feature_loss = 0.0
@@ -2080,64 +2080,64 @@ def perform_tuning_multi_teacher(
 
     progress_bar.close()
     
-    # === 🔥 最终混合损失统计报告 ===
+    # === 🔥 Final hybrid loss statistics report ===
     print(f"\n" + "="*80)
-    print(f"多TEACHER {'交替' if use_alternating_optimization else '联合'}混合损失 LoRA训练完成")
+    print(f"Multi-TEACHER {'alternating' if use_alternating_optimization else 'joint'} hybrid loss LoRA training completed")
     print(f"="*80)
     
     if use_alternating_optimization:
         total_noise_steps = sum(1 for i in range(global_step) if alt_controller.get_current_mode(i) == "noise")
         total_feature_steps = global_step - total_noise_steps
-        print(f"🔄 优化统计:")
-        print(f"  • 总步数: {global_step}")
-        print(f"  • 噪声优化步数: {total_noise_steps} ({total_noise_steps/global_step*100:.1f}%)")
-        print(f"  • 特征优化步数: {total_feature_steps} ({total_feature_steps/global_step*100:.1f}%)")
-        print(f"  • 模式切换次数: {alt_controller.mode_switch_count}")
-        print(f"  • 最终优化模式: {alt_controller.current_mode.upper()}")
+        print(f"🔄 Optimization Statistics:")
+        print(f"  • Total steps: {global_step}")
+        print(f"  • Noise optimization steps: {total_noise_steps} ({total_noise_steps/global_step*100:.1f}%)")
+        print(f"  • Feature optimization steps: {total_feature_steps} ({total_feature_steps/global_step*100:.1f}%)")
+        print(f"  • Mode switch count: {alt_controller.mode_switch_count}")
+        print(f"  • Final optimization mode: {alt_controller.current_mode.upper()}")
 
-    # 🔥 记录最终的teacher混合损失统计到TensorBoard
+    # 🔥 Log final teacher hybrid loss statistics to TensorBoard
     if writer:
         for i, tracker in enumerate(teacher_loss_trackers):
             teacher_name = f"Teacher_{i+1:02d}"
             step_count = tracker['step_count']
             
             if step_count > 0:
-                # 原有统计
+                # Original statistics
                 final_avg_noise_loss = tracker['noise_pred_loss'] / step_count
                 final_avg_unet_loss = tracker['unet_feature_align_loss'] / step_count
                 final_avg_text_loss = tracker['text_encoder_feature_align_loss'] / step_count
                 final_avg_total_loss = tracker['total_loss'] / step_count
                 final_usage_freq = step_count / global_step
                 
-                # 🔥 新增混合损失统计
+                # 🔥 New hybrid loss statistics
                 final_avg_unet_primary = tracker['unet_primary_loss'] / step_count
                 final_avg_unet_secondary = tracker['unet_secondary_loss'] / step_count
                 final_avg_text_primary = tracker['text_primary_loss'] / step_count
                 final_avg_text_secondary = tracker['text_secondary_loss'] / step_count
                 
-                # 记录最终统计
-                writer.add_scalar(f'最终统计/{teacher_name}/最终平均噪声损失', final_avg_noise_loss, global_step)
-                writer.add_scalar(f'最终统计/{teacher_name}/最终平均UNet损失', final_avg_unet_loss, global_step)
-                writer.add_scalar(f'最终统计/{teacher_name}/最终平均Text损失', final_avg_text_loss, global_step)
-                writer.add_scalar(f'最终统计/{teacher_name}/最终平均总损失', final_avg_total_loss, global_step)
-                writer.add_scalar(f'最终统计/{teacher_name}/最终使用频率', final_usage_freq, global_step)
+                # Log final statistics
+                writer.add_scalar(f'FinalStats/{teacher_name}/FinalAvgNoiseLoss', final_avg_noise_loss, global_step)
+                writer.add_scalar(f'FinalStats/{teacher_name}/FinalAvgUNetLoss', final_avg_unet_loss, global_step)
+                writer.add_scalar(f'FinalStats/{teacher_name}/FinalAvgTextLoss', final_avg_text_loss, global_step)
+                writer.add_scalar(f'FinalStats/{teacher_name}/FinalAvgTotalLoss', final_avg_total_loss, global_step)
+                writer.add_scalar(f'FinalStats/{teacher_name}/FinalUsageFrequency', final_usage_freq, global_step)
                 
-                # 🔥 最终混合损失统计
-                writer.add_scalar(f'最终混合统计/{teacher_name}/UNet主损失均值', final_avg_unet_primary, global_step)
-                writer.add_scalar(f'最终混合统计/{teacher_name}/UNet次损失均值', final_avg_unet_secondary, global_step)
-                writer.add_scalar(f'最终混合统计/{teacher_name}/Text主损失均值', final_avg_text_primary, global_step)
-                writer.add_scalar(f'最终混合统计/{teacher_name}/Text次损失均值', final_avg_text_secondary, global_step)
+                # 🔥 Final hybrid loss statistics
+                writer.add_scalar(f'FinalHybridStats/{teacher_name}/UNetPrimaryLossMean', final_avg_unet_primary, global_step)
+                writer.add_scalar(f'FinalHybridStats/{teacher_name}/UNetSecondaryLossMean', final_avg_unet_secondary, global_step)
+                writer.add_scalar(f'FinalHybridStats/{teacher_name}/TextPrimaryLossMean', final_avg_text_primary, global_step)
+                writer.add_scalar(f'FinalHybridStats/{teacher_name}/TextSecondaryLossMean', final_avg_text_secondary, global_step)
                 
-                print(f"\n📈 {teacher_name} 最终混合损失统计:")
-                print(f"   总使用次数: {step_count}/{global_step} ({final_usage_freq:.2%})")
-                print(f"   最终平均噪声损失: {final_avg_noise_loss:.6f}")
-                print(f"   🔥 UNet混合损失: 主={final_avg_unet_primary:.6f}, 次={final_avg_unet_secondary:.6f}")
-                print(f"   🔥 Text混合损失: 主={final_avg_text_primary:.6f}, 次={final_avg_text_secondary:.6f}")
-                print(f"   最终平均总损失: {final_avg_total_loss:.6f}")
+                print(f"\n📈 {teacher_name} Final Hybrid Loss Statistics:")
+                print(f"   Total usage count: {step_count}/{global_step} ({final_usage_freq:.2%})")
+                print(f"   Final average noise loss: {final_avg_noise_loss:.6f}")
+                print(f"   🔥 UNet hybrid loss: primary={final_avg_unet_primary:.6f}, secondary={final_avg_unet_secondary:.6f}")
+                print(f"   🔥 Text hybrid loss: primary={final_avg_text_primary:.6f}, secondary={final_avg_text_secondary:.6f}")
+                print(f"   Final average total loss: {final_avg_total_loss:.6f}")
 
     writer.close()
 
-    # --- 保存最终模型 ---
+    # --- Save final model ---
     final_save_dir = os.path.join(save_path, out_name)
     if not os.path.exists(final_save_dir):
         os.makedirs(final_save_dir, exist_ok=True)
@@ -2156,53 +2156,53 @@ def perform_tuning_multi_teacher(
     print(f"✓ Final multi-teacher hybrid LoRA model saved to: {final_model_path}")
     print(f"✓ TensorBoard logs saved to: {tb_log_path}")
     print(f"🔥 Multi-teacher hybrid loss training completed with {'alternating' if use_alternating_optimization else 'joint'} optimization!")
-    print(f"🔥 混合损失配置: UNet({unet_feature_loss_type}), Text({text_encoder_loss_type})")
+    print(f"🔥 Hybrid loss config: UNet({unet_feature_loss_type}), Text({text_encoder_loss_type})")
     print(f"="*80)
 
 def generate_placeholder_tokens_from_lora_names(teacher_info: List[dict]):
     """
-    根据LoRA文件名生成placeholder tokens
+    Generate placeholder tokens from LoRA filenames
     
     Args:
-        teacher_info: 包含LoRA信息的列表
+        teacher_info: List containing LoRA information
     
     Returns:
-        all_placeholder_tokens: 所有placeholder tokens的列表
-        all_initializer_tokens: 所有initializer tokens的列表
+        all_placeholder_tokens: List of all placeholder tokens
+        all_initializer_tokens: List of all initializer tokens
     """
     all_placeholder_tokens = []
     all_initializer_tokens = []
     
     for info in teacher_info:
         model_name = info["name"]
-        # 清理文件名，生成有效的token
+        # Clean filename to generate a valid token
         clean_name = clean_filename_for_token(model_name)
         placeholder_token = f"<{clean_name}>"
         
         all_placeholder_tokens.append(placeholder_token)
-        all_initializer_tokens.append("<rand-0.017>")  # 随机初始化
+        all_initializer_tokens.append("<rand-0.017>")  # Random initialization
     
     return all_placeholder_tokens, all_initializer_tokens
 
 def clean_filename_for_token(filename: str) -> str:
     """
-    清理文件名以生成有效的token名称
+    Clean filename to generate a valid token name
     """
     import re
-    # 移除特殊字符，只保留字母、数字和下划线
+    # Remove special characters, keep only letters, digits, and underscores
     clean = re.sub(r'[^a-zA-Z0-9_]', '_', filename)
-    # 移除连续的下划线
+    # Remove consecutive underscores
     clean = re.sub(r'_+', '_', clean)
-    # 移除开头和结尾的下划线
+    # Remove leading and trailing underscores
     clean = clean.strip('_')
-    # 确保不为空
+    # Ensure not empty
     if not clean:
         clean = "model"
     return clean
 
 def parse_manual_tokens(placeholder_tokens1: str, placeholder_tokens2: str, initializer_tokens: str):
     """
-    解析手动指定的tokens（向后兼容）
+    Parse manually specified tokens (backward compatibility)
     """
     all_placeholder_tokens = []
     all_initializer_tokens = []
@@ -2222,9 +2222,9 @@ def parse_manual_tokens(placeholder_tokens1: str, placeholder_tokens2: str, init
 def create_student_model(pretrained_model_name_or_path, pretrained_vae_name_or_path, revision, 
                         placeholder_tokens, initializer_tokens, device):
     """
-    创建学生模型
+    Create student model
     """
-    # 使用修改后的get_models函数来支持任意数量的tokens
+    # Use modified get_models function to support arbitrary number of tokens
     return get_models_multi_tokens(
         pretrained_model_name_or_path=pretrained_model_name_or_path,
         pretrained_vae_name_or_path=pretrained_vae_name_or_path,
@@ -2243,7 +2243,7 @@ def get_models_multi_tokens(
     device="cuda:0",
 ):
     """
-    支持任意数量tokens的模型创建函数
+    Model creation function supporting arbitrary number of tokens
     """
     tokenizer = CLIPTokenizer.from_pretrained(
         pretrained_model_name_or_path,
@@ -2316,14 +2316,14 @@ def get_models_multi_tokens(
 
 def create_multiple_teacher_models(teacher_lora_paths: List[str], pretrained_model_name_or_path: str, device: str):
     """
-    创建多个教师模型
+    Create multiple teacher models
     """
     teacher_models = []
     
     for i, lora_path in enumerate(teacher_lora_paths):
-        print(f"正在加载教师模型 {i+1}/{len(teacher_lora_paths)}: {lora_path}")
+        print(f"Loading teacher model {i+1}/{len(teacher_lora_paths)}: {lora_path}")
         
-        # 创建pipeline
+        # Create pipeline
         teacher_pipe = StableDiffusionPipeline.from_pretrained(
             pretrained_model_name_or_path, 
             torch_dtype=torch.float16
@@ -2333,7 +2333,7 @@ def create_multiple_teacher_models(teacher_lora_paths: List[str], pretrained_mod
             teacher_pipe.scheduler.config
         )
         
-        # 加载LoRA权重
+        # Load LoRA weights
         patch_pipe(
             teacher_pipe,
             lora_path,
@@ -2353,7 +2353,7 @@ def create_multiple_teacher_models(teacher_lora_paths: List[str], pretrained_mod
             "pipeline": teacher_pipe
         })
         
-        print(f"✓ 教师模型 {i+1} 加载完成")
+        print(f"✓ Teacher model {i+1} loaded successfully")
     
     return teacher_models
 
@@ -2362,11 +2362,11 @@ def setup_model_training_config(student_unet, student_text_encoder, student_vae,
                                placeholder_token_ids, enable_adaptive_gradient_clipping=True,
                                enable_mixed_precision=True, train_vae_decoder=False):
     """
-    设置模型训练配置 - 增强版
+    Set up model training configuration - enhanced version
     """
     if gradient_checkpointing:
         student_unet.enable_gradient_checkpointing()
-        # 为text encoder也启用gradient checkpointing以节省显存
+        # Enable gradient checkpointing for text encoder to save GPU memory
         if hasattr(student_text_encoder, 'gradient_checkpointing_enable'):
             student_text_encoder.gradient_checkpointing_enable()
 
@@ -2374,7 +2374,7 @@ def setup_model_training_config(student_unet, student_text_encoder, student_vae,
         from diffusers.utils.import_utils import is_xformers_available
         if is_xformers_available():
             student_unet.enable_xformers_memory_efficient_attention()
-            # 如果text encoder支持xformers，也启用
+            # If text encoder supports xformers, enable it too
             if hasattr(student_text_encoder, 'enable_xformers_memory_efficient_attention'):
                 try:
                     student_text_encoder.enable_xformers_memory_efficient_attention()
@@ -2383,36 +2383,36 @@ def setup_model_training_config(student_unet, student_text_encoder, student_vae,
         else:
             raise ValueError("xformers is not available. Make sure it is installed correctly")
 
-    # 基础设置
+    # Basic setup
     student_unet.requires_grad_(False)
     student_vae.requires_grad_(False)
 
-    # 可选：训练VAE decoder的部分层以提升重建质量
+    # Optional: train partial VAE decoder layers to improve reconstruction quality
     if train_vae_decoder:
-        # 只训练decoder的最后几层
+        # Only train the last few decoder layers
         for name, param in student_vae.named_parameters():
             if 'decoder' in name and ('conv_out' in name or 'norm_out' in name):
                 param.requires_grad = True
-                print(f"启用VAE参数训练: {name}")
+                print(f"Enabled VAE parameter training: {name}")
 
-    # 更精细的文本编码器冻结策略
-    # 完全冻结位置编码和大部分transformer层，但保留部分层的灵活性
+    # More fine-grained text encoder freezing strategy
+    # Fully freeze position embeddings and most transformer layers, but retain flexibility for some layers
     params_to_freeze = itertools.chain(
         student_text_encoder.text_model.embeddings.position_embedding.parameters(),
-        # 冻结前面大部分encoder层，保留后面几层的可训练性
+        # Freeze most front encoder layers, keep the last few layers trainable
         student_text_encoder.text_model.encoder.layers[:-2].parameters() if hasattr(student_text_encoder.text_model.encoder, 'layers') else [],
     )
     
     for param in params_to_freeze:
         param.requires_grad = False
     
-    # 保持final_layer_norm可训练以适应新的表征
+    # Keep final_layer_norm trainable to adapt to new representations
     student_text_encoder.text_model.final_layer_norm.requires_grad_(True)
 
 def calculate_learning_rates(learning_rate_unet, learning_rate_text, learning_rate_ti,
                            scale_lr, gradient_accumulation_steps, train_batch_size):
     """
-    计算学习率
+    Calculate learning rates
     """
     if scale_lr:
         unet_lr = learning_rate_unet * gradient_accumulation_steps * train_batch_size
@@ -2431,9 +2431,9 @@ def setup_lora_parameters(student_unet, student_text_encoder, train_text_encoder
                          lora_dropout_p, lora_scale, unet_lr, text_encoder_lr,
                          ti_lr, continue_inversion_lr):
     """
-    设置LoRA参数
+    Set up LoRA parameters
     """
-    # UNet LoRA设置
+    # UNet LoRA setup
     if not use_extended_lora:
         unet_lora_params, _ = inject_trainable_lora(
             student_unet,
@@ -2443,7 +2443,7 @@ def setup_lora_parameters(student_unet, student_text_encoder, train_text_encoder
             scale=lora_scale,
         )
     else:
-        print("使用扩展UNet LoRA")
+        print("Using extended UNet LoRA")
         lora_unet_target_modules = lora_unet_target_modules | UNET_EXTENDED_TARGET_REPLACE
         unet_lora_params, _ = inject_trainable_lora_extended(
             student_unet, r=lora_rank, target_replace_module=lora_unet_target_modules
@@ -2453,7 +2453,7 @@ def setup_lora_parameters(student_unet, student_text_encoder, train_text_encoder
         {"params": itertools.chain(*unet_lora_params), "lr": unet_lr},
     ]
 
-    # 文本编码器设置
+    # Text encoder setup
     student_text_encoder.requires_grad_(False)
     
     if continue_inversion:
@@ -2489,47 +2489,47 @@ def setup_lora_parameters(student_unet, student_text_encoder, train_text_encoder
 
 def extract_placeholder_tokens_from_lora_file(lora_file_path: str) -> List[str]:
     """
-    从LoRA权重文件中提取placeholder tokens
-    使用官方的 parse_safeloras_embeds 方法，这是最可靠的方式
+    Extract placeholder tokens from LoRA weight file
+    Uses the official parse_safeloras_embeds method, which is the most reliable approach
     """
     import re
     from safetensors import safe_open
     
     try:
-        print(f"正在从 {os.path.basename(lora_file_path)} 提取placeholder tokens...")
+        print(f"Extracting placeholder tokens from {os.path.basename(lora_file_path)}...")
         
         placeholder_tokens = []
         
         if lora_file_path.endswith('.safetensors'):
             with safe_open(lora_file_path, framework="pt", device="cpu") as f:
-                # 使用官方的 parse_safeloras_embeds 方法
+                # Use the official parse_safeloras_embeds method
                 try:
                     from lora_diffusion.lora import parse_safeloras_embeds
                     
-                    # 提取所有的embeddings
+                    # Extract all embeddings
                     embeds_dict = parse_safeloras_embeds(f)
                     
                     if embeds_dict:
-                        # 获取所有的token名称
+                        # Get all token names
                         placeholder_tokens = list(embeds_dict.keys())
-                        print(f"  ✅ 通过官方方法提取到 {len(placeholder_tokens)} 个tokens: {placeholder_tokens}")
+                        print(f"  ✅ Extracted {len(placeholder_tokens)} tokens via official method: {placeholder_tokens}")
                     else:
-                        print("  ⚠ 官方方法未找到任何embeddings")
+                        print("  ⚠ Official method found no embeddings")
                         
                 except ImportError as e:
-                    print(f"  ❌ 无法导入官方解析函数: {e}")
+                    print(f"  ❌ Failed to import official parsing function: {e}")
                 except Exception as e:
-                    print(f"  ❌ 官方方法执行出错: {e}")
+                    print(f"  ❌ Official method execution error: {e}")
                 
-                # 回退方案：从元数据提取
+                # Fallback: extract from metadata
                 if not placeholder_tokens:
-                    print("  🔍 尝试从元数据提取...")
+                    print("  🔍 Attempting to extract from metadata...")
                     metadata = f.metadata()
                     if metadata:
-                        # 从 <embed> 键的值中提取
+                        # Extract from the value of the <embed> key
                         embed_value = metadata.get('<embed>')
                         if embed_value and isinstance(embed_value, str):
-                            # 处理多个token的情况
+                            # Handle multiple tokens case
                             separators = ['|', ',', ';', ' ', '\n']
                             for sep in separators:
                                 if sep in embed_value:
@@ -2546,10 +2546,10 @@ def extract_placeholder_tokens_from_lora_file(lora_file_path: str) -> List[str]:
                                     
                                     if valid_tokens:
                                         placeholder_tokens.extend(valid_tokens)
-                                        print(f"  🔍 从元数据提取到 {len(valid_tokens)} 个tokens: {valid_tokens}")
+                                        print(f"  🔍 Extracted {len(valid_tokens)} tokens from metadata: {valid_tokens}")
                                         break
                             else:
-                                # 单个token
+                                # Single token
                                 if embed_value.startswith('<') and embed_value.endswith('>'):
                                     placeholder_tokens.append(embed_value)
                                 else:
@@ -2558,7 +2558,7 @@ def extract_placeholder_tokens_from_lora_file(lora_file_path: str) -> List[str]:
                                         placeholder_tokens.append(f"<{clean_embed}>")
         
         else:
-            # 处理 .pt/.pth/.bin 文件
+            # Handle .pt/.pth/.bin files
             import torch
             data = torch.load(lora_file_path, map_location="cpu")
             
@@ -2587,14 +2587,14 @@ def extract_placeholder_tokens_from_lora_file(lora_file_path: str) -> List[str]:
                             if clean_embed:
                                 placeholder_tokens.append(f"<{clean_embed}>")
         
-        # 如果都没找到，使用文件名生成
+        # If none found, generate from filename
         if not placeholder_tokens:
-            print(f"  ⚠ 无法从文件中提取placeholder tokens，使用文件名生成")
+            print(f"  ⚠ Could not extract placeholder tokens from file, generating from filename")
             filename = os.path.splitext(os.path.basename(lora_file_path))[0]
             clean_name = clean_filename_for_token(filename)
             placeholder_tokens = [f"<{clean_name}>"]
         
-        # 去重并验证格式
+        # Deduplicate and validate format
         unique_tokens = []
         for token in placeholder_tokens:
             if token not in unique_tokens:
@@ -2602,52 +2602,52 @@ def extract_placeholder_tokens_from_lora_file(lora_file_path: str) -> List[str]:
                     token = f"<{token.strip('<>')}>"
                 unique_tokens.append(token)
         
-        print(f"  ✅ 成功提取到 {len(unique_tokens)} 个placeholder tokens: {unique_tokens}")
+        print(f"  ✅ Successfully extracted {len(unique_tokens)} placeholder tokens: {unique_tokens}")
         return unique_tokens
         
     except Exception as e:
-        print(f"  ❌ 从 {lora_file_path} 提取placeholder tokens时出错: {e}")
-        # 回退到文件名方案
+        print(f"  ❌ Error extracting placeholder tokens from {lora_file_path}: {e}")
+        # Fall back to filename-based approach
         filename = os.path.splitext(os.path.basename(lora_file_path))[0]
         clean_name = clean_filename_for_token(filename)
         fallback_token = f"<{clean_name}>"
-        print(f"  🔄 使用回退方案生成token: {fallback_token}")
+        print(f"  🔄 Using fallback to generate token: {fallback_token}")
         return [fallback_token]
 
 def generate_placeholder_tokens_from_lora_weights(teacher_lora_paths: List[str], teacher_info: List[dict]):
     """
-    根据LoRA权重文件自动提取placeholder tokens
-    使用官方的 parse_safeloras_embeds 方法
+    Automatically extract placeholder tokens from LoRA weight files
+    Uses the official parse_safeloras_embeds method
     """
     all_placeholder_tokens = []
     all_initializer_tokens = []
     teacher_token_mapping = {}
     
-    print("🔍 正在从LoRA权重文件中提取placeholder tokens...")
+    print("🔍 Extracting placeholder tokens from LoRA weight files...")
     
     for i, (lora_path, info) in enumerate(zip(teacher_lora_paths, teacher_info)):
-        print(f"\n📁 处理第 {i+1}/{len(teacher_lora_paths)} 个LoRA文件: {info['filename']}")
+        print(f"\n📁 Processing LoRA file {i+1}/{len(teacher_lora_paths)}: {info['filename']}")
         
-        # 从文件中提取tokens
+        # Extract tokens from file
         extracted_tokens = extract_placeholder_tokens_from_lora_file(lora_path)
         
         if extracted_tokens:
             teacher_token_mapping[i] = extracted_tokens
             all_placeholder_tokens.extend(extracted_tokens)
             all_initializer_tokens.extend(["<rand-0.017>"] * len(extracted_tokens))
-            print(f"  ✓ Teacher {i+1} 提取到 {len(extracted_tokens)} 个tokens: {extracted_tokens}")
+            print(f"  ✓ Teacher {i+1} extracted {len(extracted_tokens)} tokens: {extracted_tokens}")
         else:
-            # 回退方案
+            # Fallback approach
             model_name = info["name"]
             clean_name = clean_filename_for_token(model_name)
             fallback_token = f"<{clean_name}>"
             teacher_token_mapping[i] = [fallback_token]
             
-            print(f"  ⚠ 未找到有效tokens，使用文件名生成: {fallback_token}")
+            print(f"  ⚠ No valid tokens found, generating from filename: {fallback_token}")
             all_placeholder_tokens.append(fallback_token)
             all_initializer_tokens.append("<rand-0.017>")
     
-    # 去重处理
+    # Deduplication
     seen = set()
     unique_placeholder_tokens = []
     unique_initializer_tokens = []
@@ -2658,19 +2658,19 @@ def generate_placeholder_tokens_from_lora_weights(teacher_lora_paths: List[str],
             unique_placeholder_tokens.append(token)
             unique_initializer_tokens.append(init_token)
         else:
-            print(f"  ⚠ 重复的token被跳过: {token}")
+            print(f"  ⚠ Duplicate token skipped: {token}")
     
-    print(f"\n✅ Token提取完成!")
-    print(f"📊 统计信息:")
-    print(f"  • 总文件数: {len(teacher_lora_paths)}")
-    print(f"  • 去重后tokens数量: {len(unique_placeholder_tokens)}")
+    print(f"\n✅ Token extraction complete!")
+    print(f"📊 Statistics:")
+    print(f"  • Total files: {len(teacher_lora_paths)}")
+    print(f"  • Deduplicated token count: {len(unique_placeholder_tokens)}")
     
-    print(f"\n🗺️ Teacher-Token映射关系:")
+    print(f"\n🗺️ Teacher-Token Mapping:")
     for teacher_idx, tokens in teacher_token_mapping.items():
         teacher_name = teacher_info[teacher_idx]['name']
         print(f"  • Teacher {teacher_idx+1} ({teacher_name}): {tokens}")
     
-    print(f"\n🏷️ 最终Tokens列表: {unique_placeholder_tokens}")
+    print(f"\n🏷️ Final Tokens list: {unique_placeholder_tokens}")
     
     return unique_placeholder_tokens, unique_initializer_tokens, teacher_token_mapping
 
@@ -2679,28 +2679,28 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
                                                train_batch_size: int, cached_latents: bool,
                                                use_template, device: str, pretrained_model_name_or_path: str):
     """
-    基于token创建独立的teacher模型和数据加载器
-    每个token对应一个独立的teacher，而不是每个LoRA文件对应一个teacher
+    Create independent teacher models and dataloaders based on tokens
+    Each token corresponds to an independent teacher, rather than each LoRA file corresponding to a teacher
     
     Returns:
-        token_based_teachers: List[dict] - 每个token对应的teacher信息
-        token_dataloaders: List[DataLoader] - 每个token对应的数据加载器
-        token_teacher_mapping: dict - token到teacher索引的映射
+        token_based_teachers: List[dict] - Teacher info for each token
+        token_dataloaders: List[DataLoader] - Dataloader for each token
+        token_teacher_mapping: dict - Mapping from token to teacher index
     """
     
-    print(f"\n🔄 转换为基于Token的Teacher模式")
-    print(f"原模式: {len(teacher_lora_paths)} 个LoRA文件 -> 新模式: 每个Token一个Teacher")
+    print(f"\n🔄 Converting to Token-based Teacher mode")
+    print(f"Original mode: {len(teacher_lora_paths)} LoRA files -> New mode: one Teacher per Token")
     
     token_based_teachers = []
     token_dataloaders = []
     token_teacher_mapping = {}
     
-    # 固定每个token的图片数量
+    # Fixed number of images per token
     IMAGES_PER_TOKEN = 10
     
-    # 统计所有tokens
+    # Count all tokens
     all_tokens_info = []
-    token_to_source_lora = {}  # 记录每个token来自哪个原始LoRA文件
+    token_to_source_lora = {}  # Track which original LoRA file each token comes from
     
     for lora_idx, (lora_path, info) in enumerate(zip(teacher_lora_paths, teacher_info)):
         tokens = teacher_token_mapping.get(lora_idx, [])
@@ -2717,20 +2717,20 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
                 'lora_idx': lora_idx
             }
     
-    print(f"📊 发现总共 {len(all_tokens_info)} 个独立tokens")
+    print(f"📊 Found {len(all_tokens_info)} independent tokens in total")
     
-    # 为每个token创建独立的teacher
+    # Create an independent teacher for each token
     for token_idx, token_info in enumerate(all_tokens_info):
         token = token_info['token']
         source_lora_path = token_info['source_lora_path']
         source_info = token_info['source_lora_info']
         
-        print(f"\n🎯 为Token {token_idx+1}/{len(all_tokens_info)} 创建Teacher")
+        print(f"\n🎯 Creating Teacher for Token {token_idx+1}/{len(all_tokens_info)}")
         print(f"  🏷️ Token: {token}")
-        print(f"  📁 来源LoRA: {source_info['filename']}")
+        print(f"  📁 Source LoRA: {source_info['filename']}")
         
-        # 创建该token对应的teacher模型（重用相同LoRA文件的pipeline）
-        # 检查是否已经为这个LoRA文件创建过pipeline
+        # Create the teacher model for this token (reuse pipeline of the same LoRA file)
+        # Check if a pipeline has already been created for this LoRA file
         existing_pipeline = None
         for existing_teacher in token_based_teachers:
             if existing_teacher.get('source_lora_path') == source_lora_path:
@@ -2738,11 +2738,11 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
                 break
         
         if existing_pipeline is not None:
-            print(f"  ♻️ 重用已创建的pipeline")
+            print(f"  ♻️ Reusing existing pipeline")
             teacher_pipeline = existing_pipeline
         else:
-            print(f"  🔧 创建新的pipeline")
-            # 创建新的pipeline
+            print(f"  🔧 Creating new pipeline")
+            # Create new pipeline
             teacher_pipeline = StableDiffusionPipeline.from_pretrained(
                 pretrained_model_name_or_path, 
                 torch_dtype=torch.float16
@@ -2752,7 +2752,7 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
                 teacher_pipeline.scheduler.config
             )
             
-            # 加载LoRA权重
+            # Load LoRA weights
             patch_pipe(
                 teacher_pipeline,
                 source_lora_path,
@@ -2764,7 +2764,7 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
             tune_lora_scale(teacher_pipeline.unet, 1.0)
             tune_lora_scale(teacher_pipeline.text_encoder, 1.0)
         
-        # 创建token-specific的teacher信息
+        # Create token-specific teacher info
         token_teacher = {
             "unet": teacher_pipeline.unet,
             "text_encoder": teacher_pipeline.text_encoder,
@@ -2780,17 +2780,17 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
         token_based_teachers.append(token_teacher)
         token_teacher_mapping[token] = token_idx
         
-        print(f"  ✅ Teacher {token_idx+1} 创建完成")
+        print(f"  ✅ Teacher {token_idx+1} created successfully")
         
-        # 为该token创建专用的数据加载器
-        print(f"  📊 创建专用数据加载器...")
+        # Create dedicated dataloader for this token
+        print(f"  📊 Creating dedicated dataloader...")
         
-        # 创建token专用的token_map，使用特定的数据集大小
+        # Create token-specific token_map with specific dataset size
         token_map = {}
         for i in range(IMAGES_PER_TOKEN):
-            token_map[f"SAMPLE_{i}"] = token  # 为每个样本都映射到目标token
+            token_map[f"SAMPLE_{i}"] = token  # Map each sample to the target token
         
-        # 使用现有的 PivotalTuningDatasetCapationLoraGenerated 类
+        # Use the existing PivotalTuningDatasetCapationLoraGenerated class
         dataset = PivotalTuningDatasetCapationLoraGenerated(
             sd_pipeline=teacher_pipeline,
             device=device,
@@ -2805,7 +2805,7 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
             save_image_prefix=f"token_{token_idx+1:02d}_{token.replace('<', '').replace('>', '')}"
         )
         
-        # 创建数据加载器
+        # Create dataloader
         dataloader = text2img_dataloader_combined_with_latent_caching(
             train_dataset=dataset,
             train_batch_size=train_batch_size,
@@ -2817,46 +2817,46 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
         
         token_dataloaders.append(dataloader)
         
-        print(f"  ✅ Token {token_idx+1} 数据加载器创建完成")
-        print(f"    • 数据集大小: {IMAGES_PER_TOKEN}")
-        print(f"    • 目标Token: {token}")
-        print(f"    • 保存路径: /root/lora_train/pic_token_based")
+        print(f"  ✅ Token {token_idx+1} dataloader created successfully")
+        print(f"    • Dataset size: {IMAGES_PER_TOKEN}")
+        print(f"    • Target Token: {token}")
+        print(f"    • Save path: /root/lora_train/pic_token_based")
         
-        # 测试数据集是否正确生成目标token的内容
-        print(f"  🧪 验证数据集Token映射:")
+        # Test whether the dataset correctly generates content for the target token
+        print(f"  🧪 Validating dataset Token mapping:")
         try:
-            # 获取一个样本来验证
+            # Get a sample to verify
             test_sample = dataset[0]
-            raw_text = test_sample.get('raw_text', '未知')
-            print(f"    • 样本0文本: '{raw_text}'")
+            raw_text = test_sample.get('raw_text', 'unknown')
+            print(f"    • Sample 0 text: '{raw_text}'")
             if token in raw_text:
-                print(f"    ✅ 确认包含目标token: {token}")
+                print(f"    ✅ Confirmed target token present: {token}")
             else:
-                print(f"    ⚠️ 样本文本未包含目标token")
+                print(f"    ⚠️ Sample text does not contain the target token")
         except Exception as e:
-            print(f"    ⚠️ 数据集验证时出错: {e}")
+            print(f"    ⚠️ Error during dataset validation: {e}")
     
-    # 创建新的token到teacher索引的映射
+    # Create new mapping from token to teacher index
     new_token_teacher_mapping = {}
     for token_idx, teacher in enumerate(token_based_teachers):
         token = teacher['token']
-        new_token_teacher_mapping[token_idx] = [token]  # 每个teacher对应一个token
+        new_token_teacher_mapping[token_idx] = [token]  # Each teacher corresponds to one token
     
-    print(f"\n📋 基于Token的Teacher创建完成:")
-    print(f"  🎯 Token数量: {len(all_tokens_info)}")
-    print(f"  🏫 Teacher数量: {len(token_based_teachers)}")
-    print(f"  📊 数据加载器数量: {len(token_dataloaders)}")
+    print(f"\n📋 Token-based Teacher creation completed:")
+    print(f"  🎯 Token count: {len(all_tokens_info)}")
+    print(f"  🏫 Teacher count: {len(token_based_teachers)}")
+    print(f"  📊 Dataloader count: {len(token_dataloaders)}")
     
-    print(f"\n🗺️ Token-Teacher映射关系:")
+    print(f"\n🗺️ Token-Teacher Mapping:")
     for token_idx, teacher in enumerate(token_based_teachers):
         token = teacher['token']
         source_file = teacher['source_lora_info']['filename']
-        print(f"  • Teacher {token_idx+1}: {token} (来源: {source_file})")
+        print(f"  • Teacher {token_idx+1}: {token} (source: {source_file})")
     
-    print(f"\n🔍 数据生成验证:")
-    print(f"  • 每个token生成 {IMAGES_PER_TOKEN} 张图片")
-    print(f"  • 图片保存到: /root/lora_train/pic_token_based")
-    print(f"  • 使用模板类型: {use_template}")
+    print(f"\n🔍 Data generation verification:")
+    print(f"  • {IMAGES_PER_TOKEN} images generated per token")
+    print(f"  • Images saved to: /root/lora_train/pic_token_based")
+    print(f"  • Template type used: {use_template}")
     
     return token_based_teachers, token_dataloaders, new_token_teacher_mapping
 
@@ -2864,25 +2864,25 @@ def create_multiple_dataloaders_enhanced(teacher_models: List[dict], teacher_inf
                                        teacher_token_mapping: dict, student_tokenizer, 
                                        train_batch_size: int, cached_latents: bool,
                                        use_template, device: str,
-                                       # 新增参数
+                                       # Additional parameters
                                        use_token_based_teachers: bool = True,
                                        teacher_lora_paths: List[str] = None,
                                        pretrained_model_name_or_path: str = None):
     """
-    增强版数据加载器创建函数
-    支持两种模式：
-    1. 原模式：每个LoRA文件一个teacher（可能包含多个tokens）
-    2. 新模式：每个token一个teacher
+    Enhanced dataloader creation function
+    Supports two modes:
+    1. Original mode: one teacher per LoRA file (may contain multiple tokens)
+    2. New mode: one teacher per token
     
-    使用现有的 PivotalTuningDatasetCapationLoraGenerated 类
+    Uses the existing PivotalTuningDatasetCapationLoraGenerated class
     """
     
     if use_token_based_teachers:
-        print("🎯 使用基于Token的Teacher模式")
+        print("🎯 Using Token-based Teacher mode")
         if teacher_lora_paths is None or pretrained_model_name_or_path is None:
-            raise ValueError("基于Token的模式需要提供 teacher_lora_paths 和 pretrained_model_name_or_path")
+            raise ValueError("Token-based mode requires teacher_lora_paths and pretrained_model_name_or_path")
         
-        # 使用新的基于token的创建方法
+        # Use new token-based creation method
         return create_token_based_teachers_and_dataloaders(
             teacher_lora_paths=teacher_lora_paths,
             teacher_info=teacher_info,
@@ -2895,15 +2895,15 @@ def create_multiple_dataloaders_enhanced(teacher_models: List[dict], teacher_inf
             pretrained_model_name_or_path=pretrained_model_name_or_path
         )
     else:
-        print("📁 使用基于LoRA文件的Teacher模式（原模式）")
-        # 使用原有的创建方法，也基于现有的 PivotalTuningDatasetCapationLoraGenerated 类
+        print("📁 Using LoRA file-based Teacher mode (original mode)")
+        # Use original creation method, also based on the existing PivotalTuningDatasetCapationLoraGenerated class
         dataloaders = []
         
         IMAGES_PER_TOKEN = 10
         
         for i, (teacher_model, info) in enumerate(zip(teacher_models, teacher_info)):
-            print(f"\n🔧 为Teacher {i+1} 创建数据加载器:")
-            print(f"  📁 模型: {info['name']}")
+            print(f"\n🔧 Creating dataloader for Teacher {i+1}:")
+            print(f"  📁 Model: {info['name']}")
             
             teacher_tokens = teacher_token_mapping.get(i, [])
             
@@ -2922,20 +2922,20 @@ def create_multiple_dataloaders_enhanced(teacher_models: List[dict], teacher_inf
                     model_name = info["name"]
                     clean_name = clean_filename_for_token(model_name)
                     teacher_tokens = [f"<{clean_name}>"]
-                    print(f"  ⚠ 未找到teacher tokens，使用生成的token: {teacher_tokens}")
+                    print(f"  ⚠ No teacher tokens found, using generated token: {teacher_tokens}")
             
             print(f"  🏷️ Teacher {i+1} Tokens: {teacher_tokens}")
-            print(f"  📊 Token数量: {len(teacher_tokens)}")
+            print(f"  📊 Token count: {len(teacher_tokens)}")
             
             total_tokens = len(teacher_tokens)
             dataset_size = total_tokens * IMAGES_PER_TOKEN
             
-            print(f"  📸 数据集配置:")
-            print(f"    • 每个token生成图片数: {IMAGES_PER_TOKEN}")
-            print(f"    • 总token数: {total_tokens}")
-            print(f"    • 总数据集大小: {dataset_size}")
+            print(f"  📸 Dataset configuration:")
+            print(f"    • Images per token: {IMAGES_PER_TOKEN}")
+            print(f"    • Total tokens: {total_tokens}")
+            print(f"    • Total dataset size: {dataset_size}")
             
-            # 创建token_map - 为每个样本分配对应的token
+            # Create token_map - assign corresponding token to each sample
             token_map = {}
             
             for sample_idx in range(dataset_size):
@@ -2946,13 +2946,13 @@ def create_multiple_dataloaders_enhanced(teacher_models: List[dict], teacher_inf
                     current_token = teacher_tokens[sample_idx % len(teacher_tokens)]
                 token_map[f"SAMPLE_{sample_idx}"] = current_token
             
-            # 也为兼容性添加一些通用映射
+            # Also add some general mappings for compatibility
             for j, token in enumerate(teacher_tokens):
                 token_map[f"TOKEN_{j}"] = token
             
-            print(f"  🗺️ Token映射创建完成，包含 {len(token_map)} 个映射条目")
+            print(f"  🗺️ Token mapping created with {len(token_map)} mapping entries")
             
-            # 使用现有的 PivotalTuningDatasetCapationLoraGenerated 类
+            # Use the existing PivotalTuningDatasetCapationLoraGenerated class
             dataset = PivotalTuningDatasetCapationLoraGenerated(
                 sd_pipeline=teacher_model["pipeline"],
                 device=device,
@@ -2977,35 +2977,35 @@ def create_multiple_dataloaders_enhanced(teacher_models: List[dict], teacher_inf
             )
             
             dataloaders.append(dataloader)
-            print(f"  ✅ Teacher {i+1} 数据加载器创建完成")
+            print(f"  ✅ Teacher {i+1} dataloader created successfully")
             
-            print(f"  🔍 预期token分布:")
+            print(f"  🔍 Expected token distribution:")
             for j, token in enumerate(teacher_tokens):
                 start_idx = j * IMAGES_PER_TOKEN
                 end_idx = start_idx + IMAGES_PER_TOKEN
-                print(f"    • {token}: 样本 {start_idx}-{end_idx-1} ({IMAGES_PER_TOKEN}张)")
+                print(f"    • {token}: samples {start_idx}-{end_idx-1} ({IMAGES_PER_TOKEN} images)")
             
-            # 验证数据集
-            print(f"  🧪 验证数据集Token分布:")
+            # Validate dataset
+            print(f"  🧪 Validating dataset Token distribution:")
             try:
                 for test_idx in [0, dataset_size//2, dataset_size-1]:
                     if test_idx < len(dataset):
                         test_sample = dataset[test_idx]
-                        raw_text = test_sample.get('raw_text', '未知')
-                        print(f"    • 样本{test_idx}: '{raw_text[:50]}...'")
+                        raw_text = test_sample.get('raw_text', 'unknown')
+                        print(f"    • Sample {test_idx}: '{raw_text[:50]}...'")
             except Exception as e:
-                print(f"    ⚠️ 数据集验证时出错: {e}")
+                print(f"    ⚠️ Error during dataset validation: {e}")
         
         return dataloaders
 
 def discover_lora_models(lora_models_dir: str, lora_path1: str = None, lora_path2: str = None):
     """
-    发现文件夹下的所有LoRA模型文件
+    Discover all LoRA model files in the directory
     """
     teacher_lora_paths = []
     teacher_info = []
     
-    # 向后兼容：如果提供了单个路径，使用它们
+    # Backward compatibility: use individual paths if provided
     if lora_path1 and lora_path2:
         teacher_lora_paths = [lora_path1, lora_path2]
         teacher_info = [
@@ -3014,20 +3014,20 @@ def discover_lora_models(lora_models_dir: str, lora_path1: str = None, lora_path
         ]
         return teacher_lora_paths, teacher_info
     
-    # 新方式：从文件夹中发现所有LoRA模型
+    # New approach: discover all LoRA models from directory
     if not os.path.exists(lora_models_dir):
-        raise ValueError(f"LoRA模型文件夹不存在: {lora_models_dir}")
+        raise ValueError(f"LoRA model directory does not exist: {lora_models_dir}")
     
-    # 支持的LoRA文件扩展名
+    # Supported LoRA file extensions
     supported_extensions = ['.safetensors', '.pt', '.pth', '.bin']
     
-    print(f"🔍 扫描文件夹: {lora_models_dir}")
+    print(f"🔍 Scanning directory: {lora_models_dir}")
     
     for filename in sorted(os.listdir(lora_models_dir)):
         if any(filename.lower().endswith(ext) for ext in supported_extensions):
             file_path = os.path.join(lora_models_dir, filename)
             if os.path.isfile(file_path):
-                # 从文件名提取模型名称（去除扩展名）
+                # Extract model name from filename (remove extension)
                 model_name = os.path.splitext(filename)[0]
                 teacher_lora_paths.append(file_path)
                 teacher_info.append({
@@ -3035,26 +3035,26 @@ def discover_lora_models(lora_models_dir: str, lora_path1: str = None, lora_path
                     "filename": filename,
                     "path": file_path
                 })
-                print(f"  📄 发现LoRA文件: {filename}")
+                print(f"  📄 Found LoRA file: {filename}")
     
-    print(f"📊 总共发现 {len(teacher_lora_paths)} 个LoRA文件")
+    print(f"📊 Found {len(teacher_lora_paths)} LoRA files in total")
     
     if len(teacher_lora_paths) == 0:
-        raise ValueError(f"在 {lora_models_dir} 中未找到任何支持的LoRA文件")
+        raise ValueError(f"No supported LoRA files found in {lora_models_dir}")
     
     return teacher_lora_paths, teacher_info
 
-# 修改主训练函数，添加新的参数
+# Modified main training function with new parameters
 def train(
-    # --- 主要参数 ---
+    # --- Main parameters ---
     lora_models_dir: str,
     lora_path1: str = None,
     lora_path2: str = None,
     auto_extract_tokens_from_weights: bool = True,
     auto_generate_placeholder_tokens: bool = False,
-    use_token_based_teachers: bool = True,  # 默认使用基于token的teacher模式
+    use_token_based_teachers: bool = True,  # Default to token-based teacher mode
     
-    # --- 基础模型配置 ---
+    # --- Base model configuration ---
     instance_data_dir: str = "",
     pretrained_model_name_or_path: str = "",
     output_dir: str = "",
@@ -3062,23 +3062,23 @@ def train(
     pretrained_vae_name_or_path: str = None,
     revision: Optional[str] = None,
     
-    # --- 训练模式配置 ---
+    # --- Training mode configuration ---
     perform_inversion: bool = False,
     use_template: Literal[None, "object", "style"] = None,
     train_inpainting: bool = False,
     
-    # --- Token配置 ---
+    # --- Token configuration ---
     placeholder_tokens: str = "",
     placeholder_tokens1: str = "",
     placeholder_tokens2: str = "",
     placeholder_token_at_data: Optional[str] = None,
     initializer_tokens: Optional[str] = None,
     
-    # --- Teacher选择策略 ---
+    # --- Teacher selection strategy ---
     teacher_selection_strategy: str = "round_robin",
     teacher_weights: Optional[List[float]] = None,
     
-    # --- 基础训练参数 ---
+    # --- Basic training parameters ---
     seed: int = 42,
     resolution: int = 512,
     color_jitter: bool = True,
@@ -3090,7 +3090,7 @@ def train(
     gradient_accumulation_steps: int = 4,
     gradient_checkpointing: bool = False,
     
-    # --- LoRA配置 ---
+    # --- LoRA configuration ---
     lora_rank: int = 4,
     lora_unet_target_modules={"CrossAttention", "Attention", "GEGLU"},
     lora_clip_target_modules={"CLIPSdpaAttention"},
@@ -3099,7 +3099,7 @@ def train(
     use_extended_lora: bool = False,
     clip_ti_decay: bool = True,
     
-    # --- 学习率配置 ---
+    # --- Learning rate configuration ---
     learning_rate_unet: float = 1e-4,
     learning_rate_text: float = 1e-5,
     learning_rate_ti: float = 5e-4,
@@ -3107,29 +3107,29 @@ def train(
     continue_inversion_lr: Optional[float] = None,
     scale_lr: bool = False,
     
-    # --- 学习率调度器 ---
+    # --- Learning rate scheduler ---
     lr_scheduler: str = "linear",
     lr_warmup_steps: int = 0,
     lr_scheduler_lora: str = "linear",
     lr_warmup_steps_lora: int = 0,
     
-    # --- 数据处理配置 ---
+    # --- Data processing configuration ---
     use_face_segmentation_condition: bool = False,
     cached_latents: bool = True,
     use_mask_captioned_data: bool = False,
     mask_temperature: float = 1.0,
     
-    # --- 优化器配置 ---
+    # --- Optimizer configuration ---
     weight_decay_ti: float = 0.00,
     weight_decay_lora: float = 0.001,
     use_8bit_adam: bool = False,
     
-    # --- 设备和系统配置 ---
+    # --- Device and system configuration ---
     device: str = "cuda:0",
     extra_args: Optional[dict] = None,
     enable_xformers_memory_efficient_attention: bool = False,
     
-    # --- 日志配置 ---
+    # --- Logging configuration ---
     log_wandb: bool = False,
     wandb_log_prompt_cnt: int = 10,
     wandb_project_name: str = "new_pti_project",
@@ -3138,45 +3138,45 @@ def train(
     out_name: str = "final_lora_log2",
     tensorboard_log_dir: str = "runs_new",
     
-    # --- 损失权重配置 ---
+    # --- Loss weight configuration ---
     feature_align_weight: float = 0.01,
     noise_pred_weight: float = 1.0,
     
-    # --- 交替优化参数 ---
+    # --- Alternating optimization parameters ---
     use_alternating_optimization: bool = True,
     alternating_interval: int = 5,
     alternating_schedule: str = "fixed",
     noise_only_steps: int = 100,
     feature_only_steps: int = 0,
     
-    # --- 数据可视化参数 ---
+    # --- Data visualization parameters ---
     enable_dataloader_visualization: bool = False,
     visualization_samples_per_teacher: int = 2,
 ):
     """
-    支持多teacher蒸馏的训练函数
+    Training function supporting multi-teacher distillation
     
-    功能特性：
-    1. 支持基于Token的Teacher模式（每个token一个teacher）和基于LoRA文件的Teacher模式
-    2. 自动从LoRA权重文件提取tokens
-    3. 支持多种teacher选择策略
-    4. 集成特征对齐损失
-    5. 支持交替优化策略
-    6. 可选的数据加载器可视化
+    Features:
+    1. Supports Token-based Teacher mode (one teacher per token) and LoRA file-based Teacher mode
+    2. Automatic token extraction from LoRA weight files
+    3. Supports multiple teacher selection strategies
+    4. Integrated feature alignment loss
+    5. Supports alternating optimization strategy
+    6. Optional dataloader visualization
     
     Args:
-        use_token_based_teachers: 是否使用基于token的teacher模式
-        auto_extract_tokens_from_weights: 是否自动从权重文件提取tokens
-        teacher_selection_strategy: teacher选择策略 ("round_robin", "weighted_random", "adaptive")
-        use_alternating_optimization: 是否使用交替优化（noise loss和feature loss交替）
-        enable_dataloader_visualization: 是否启用数据加载器可视化
+        use_token_based_teachers: Whether to use token-based teacher mode
+        auto_extract_tokens_from_weights: Whether to automatically extract tokens from weight files
+        teacher_selection_strategy: Teacher selection strategy ("round_robin", "weighted_random", "adaptive")
+        use_alternating_optimization: Whether to use alternating optimization (alternating noise loss and feature loss)
+        enable_dataloader_visualization: Whether to enable dataloader visualization
     """
     
-    # --- 1. 初始化和基础设置 ---
+    # --- 1. Initialization and basic setup ---
     print(f"\n{'='*80}")
-    print(f"多Teacher LoRA蒸馏训练开始")
-    print(f"模式: {'基于Token的Teacher' if use_token_based_teachers else '基于LoRA文件的Teacher'}")
-    print(f"交替优化: {'启用' if use_alternating_optimization else '禁用'}")
+    print(f"Multi-Teacher LoRA Distillation Training Started")
+    print(f"Mode: {'Token-based Teacher' if use_token_based_teachers else 'LoRA file-based Teacher'}")
+    print(f"Alternating optimization: {'enabled' if use_alternating_optimization else 'disabled'}")
     print(f"{'='*80}")
     
     torch.manual_seed(seed)
@@ -3198,41 +3198,41 @@ def train(
     if output_dir is not None:
         os.makedirs(output_dir, exist_ok=True)
 
-    # --- 2. 发现和加载LoRA模型 ---
+    # --- 2. Discover and load LoRA models ---
     teacher_lora_paths, teacher_info = discover_lora_models(lora_models_dir, lora_path1, lora_path2)
     num_lora_files = len(teacher_lora_paths)
     
-    print(f"\n📋 发现 {num_lora_files} 个LoRA文件:")
+    print(f"\n📋 Found {num_lora_files} LoRA files:")
     for i, (path, info) in enumerate(zip(teacher_lora_paths, teacher_info)):
         print(f"  📁 LoRA {i+1}: {info['filename']}")
 
     if num_lora_files == 0:
-        raise ValueError(f"在指定位置未找到有效的LoRA模型文件")
+        raise ValueError(f"No valid LoRA model files found at the specified location")
 
-    # --- 3. 提取placeholder tokens ---
+    # --- 3. Extract placeholder tokens ---
     if auto_extract_tokens_from_weights:
-        print("🔍 启用从LoRA权重文件自动提取placeholder tokens模式")
+        print("🔍 Auto-extraction of placeholder tokens from LoRA weight files enabled")
         all_placeholder_tokens, all_initializer_tokens, original_teacher_token_mapping = generate_placeholder_tokens_from_lora_weights(
             teacher_lora_paths, teacher_info
         )
     elif auto_generate_placeholder_tokens:
-        print("📝 启用基于文件名生成placeholder tokens模式")
+        print("📝 Filename-based placeholder tokens generation enabled")
         all_placeholder_tokens, all_initializer_tokens = generate_placeholder_tokens_from_lora_names(teacher_info)
         original_teacher_token_mapping = {i: [all_placeholder_tokens[i]] for i in range(len(all_placeholder_tokens))}
     else:
-        print("✋ 使用手动指定的placeholder tokens")
+        print("✋ Using manually specified placeholder tokens")
         all_placeholder_tokens, all_initializer_tokens = parse_manual_tokens(
             placeholder_tokens1, placeholder_tokens2, initializer_tokens
         )
         original_teacher_token_mapping = {i: [all_placeholder_tokens[i]] for i in range(len(all_placeholder_tokens))}
 
-    # 验证tokens数量
-    print(f"\n📋 Token提取结果:")
-    print(f"  🏷️ 所有Tokens: {all_placeholder_tokens}")
-    print(f"  📊 LoRA文件数: {num_lora_files}, 总Token数: {len(all_placeholder_tokens)}")
+    # Validate token count
+    print(f"\n📋 Token Extraction Results:")
+    print(f"  🏷️ All Tokens: {all_placeholder_tokens}")
+    print(f"  📊 LoRA file count: {num_lora_files}, Total token count: {len(all_placeholder_tokens)}")
 
-    # --- 4. 创建学生模型 ---
-    print(f"\n🎓 创建学生模型...")
+    # --- 4. Create student model ---
+    print(f"\n🎓 Creating student model...")
     student_text_encoder, student_vae, student_unet, student_tokenizer, placeholder_token_ids = create_student_model(
         pretrained_model_name_or_path=pretrained_model_name_or_path,
         pretrained_vae_name_or_path=pretrained_vae_name_or_path,
@@ -3241,16 +3241,16 @@ def train(
         initializer_tokens=all_initializer_tokens,
         device=device
     )
-    print(f"✅ 学生模型创建完成，包含 {len(all_placeholder_tokens)} 个新tokens")
+    print(f"✅ Student model created with {len(all_placeholder_tokens)} new tokens")
 
-    # --- 5. 根据模式创建teacher模型和数据加载器 ---
+    # --- 5. Create teacher models and dataloaders based on mode ---
     if use_token_based_teachers:
-        print(f"\n🎯 使用基于Token的Teacher模式")
-        print(f"每个Token将成为一个独立的Teacher")
+        print(f"\n🎯 Using Token-based Teacher mode")
+        print(f"Each Token will become an independent Teacher")
         
-        # 直接创建基于token的teachers和dataloaders
+        # Directly create token-based teachers and dataloaders
         teacher_models, dataloaders, teacher_token_mapping = create_multiple_dataloaders_enhanced(
-            teacher_models=None,  # 不需要预创建的teacher_models
+            teacher_models=None,  # No pre-created teacher_models needed
             teacher_info=teacher_info,
             teacher_token_mapping=original_teacher_token_mapping,
             student_tokenizer=student_tokenizer,
@@ -3264,13 +3264,13 @@ def train(
         )
         
         num_teachers = len(teacher_models)
-        print(f"📊 最终结果: {num_teachers} 个基于Token的Teachers")
+        print(f"📊 Final result: {num_teachers} Token-based Teachers")
         
     else:
-        print(f"\n📁 使用基于LoRA文件的Teacher模式（原模式）")
-        print(f"每个LoRA文件对应一个Teacher（可能包含多个tokens）")
+        print(f"\n📁 Using LoRA file-based Teacher mode (original mode)")
+        print(f"Each LoRA file corresponds to one Teacher (may contain multiple tokens)")
         
-        # 原模式：先创建teacher models，再创建dataloaders
+        # Original mode: create teacher models first, then dataloaders
         teacher_models = create_multiple_teacher_models(
             teacher_lora_paths=teacher_lora_paths,
             pretrained_model_name_or_path=pretrained_model_name_or_path,
@@ -3291,41 +3291,41 @@ def train(
         
         teacher_token_mapping = original_teacher_token_mapping
         num_teachers = len(teacher_models)
-        print(f"📊 最终结果: {num_teachers} 个基于LoRA文件的Teachers")
+        print(f"📊 Final result: {num_teachers} LoRA file-based Teachers")
 
-    # 提取UNet和text encoder列表
+    # Extract UNet and text encoder lists
     teacher_unets = [model["unet"] for model in teacher_models]
     teacher_text_encoders = [model["text_encoder"] for model in teacher_models]
 
-    # --- 7. 显示最终配置 ---
-    print(f"\n📋 最终训练配置:")
-    print(f"  🎯 Teacher模式: {'基于Token' if use_token_based_teachers else '基于LoRA文件'}")
-    print(f"  🏫 Teacher数量: {num_teachers}")
-    print(f"  🏷️ Token数量: {len(all_placeholder_tokens)}")
-    print(f"  📊 数据加载器数量: {len(dataloaders)}")
-    print(f"  🔄 Teacher选择策略: {teacher_selection_strategy}")
-    print(f"  ⚡ 交替优化: {'启用' if use_alternating_optimization else '禁用'}")
+    # --- 7. Display final configuration ---
+    print(f"\n📋 Final Training Configuration:")
+    print(f"  🎯 Teacher mode: {'Token-based' if use_token_based_teachers else 'LoRA file-based'}")
+    print(f"  🏫 Teacher count: {num_teachers}")
+    print(f"  🏷️ Token count: {len(all_placeholder_tokens)}")
+    print(f"  📊 Dataloader count: {len(dataloaders)}")
+    print(f"  🔄 Teacher selection strategy: {teacher_selection_strategy}")
+    print(f"  ⚡ Alternating optimization: {'enabled' if use_alternating_optimization else 'disabled'}")
     
     if use_token_based_teachers:
-        print(f"  🔗 Token-Teacher对应关系:")
+        print(f"  🔗 Token-Teacher correspondence:")
         for teacher_idx, teacher in enumerate(teacher_models):
             token = teacher['token']
             source_file = teacher['source_lora_info']['filename']
-            print(f"    • Teacher {teacher_idx+1}: {token} (来源: {source_file})")
+            print(f"    • Teacher {teacher_idx+1}: {token} (source: {source_file})")
     else:
-        print(f"  🔗 LoRA-Teacher对应关系:")
+        print(f"  🔗 LoRA-Teacher correspondence:")
         for teacher_idx, tokens in teacher_token_mapping.items():
             teacher_name = teacher_info[teacher_idx]['name'] if teacher_idx < len(teacher_info) else f"teacher_{teacher_idx}"
             print(f"    • Teacher {teacher_idx+1} ({teacher_name}): {tokens}")
 
-    # --- 8. 训练配置设置 ---
+    # --- 8. Training configuration setup ---
     
-    # 设置噪声调度器
+    # Set up noise scheduler
     noise_scheduler = DDPMScheduler.from_config(
         pretrained_model_name_or_path, subfolder="scheduler"
     )
 
-    # 配置模型训练设置
+    # Configure model training settings
     setup_model_training_config(
         student_unet=student_unet,
         student_text_encoder=student_text_encoder,
@@ -3335,7 +3335,7 @@ def train(
         placeholder_token_ids=placeholder_token_ids,
     )
 
-    # 计算学习率
+    # Calculate learning rates
     unet_lr, text_encoder_lr, ti_lr = calculate_learning_rates(
         learning_rate_unet=learning_rate_unet,
         learning_rate_text=learning_rate_text,
@@ -3345,11 +3345,11 @@ def train(
         train_batch_size=train_batch_size
     )
 
-    # --- 9. 文本逆向训练（如果启用） ---
+    # --- 9. Textual inversion training (if enabled) ---
     if perform_inversion:
         print(f"\n{'='*80}")
-        print(f"开始{'基于Token' if use_token_based_teachers else '基于LoRA文件'}的文本逆向训练")
-        print(f"Teacher数量: {num_teachers}, Token数量: {len(all_placeholder_tokens)}")
+        print(f"Starting {'Token-based' if use_token_based_teachers else 'LoRA file-based'} textual inversion training")
+        print(f"Teacher count: {num_teachers}, Token count: {len(all_placeholder_tokens)}")
         print(f"{'='*80}")
         
         ti_optimizer = optim.AdamW(
@@ -3370,7 +3370,7 @@ def train(
         index_no_updates = torch.tensor([tid in placeholder_token_ids for tid in range(len(student_tokenizer))], 
                                  device=student_text_encoder.device)
         true_count = index_no_updates.sum().item()
-        print(f"🔍 index_no_updates中True的数量: {true_count}")
+        print(f"🔍 Number of True values in index_no_updates: {true_count}")
 
         train_inversion_with_multi_feature_alignment(
             teacher_unets=teacher_unets,
@@ -3408,17 +3408,17 @@ def train(
 
         del ti_optimizer
 
-    # --- 10. LoRA微调训练 ---
+    # --- 10. LoRA fine-tuning training ---
     print(f"\n{'='*80}")
-    print(f"开始{'基于Token' if use_token_based_teachers else '基于LoRA文件'}的LoRA微调训练")
-    print(f"Teacher数量: {num_teachers}, Token数量: {len(all_placeholder_tokens)}")
+    print(f"Starting {'Token-based' if use_token_based_teachers else 'LoRA file-based'} LoRA fine-tuning training")
+    print(f"Number of Teachers: {num_teachers}, Number of tokens: {len(all_placeholder_tokens)}")
     if use_alternating_optimization:
-        print(f"优化模式: 交替优化 (间隔: {alternating_interval}, 策略: {alternating_schedule})")
+        print(f"Optimization mode: alternating (interval: {alternating_interval}, strategy: {alternating_schedule})")
     else:
-        print(f"优化模式: 联合优化")
+        print(f"Optimization mode: joint optimization")
     print(f"{'='*80}")
 
-    # 设置LoRA参数
+    # Set up LoRA parameters
     unet_lora_params, text_encoder_lora_params = setup_lora_parameters(
         student_unet=student_unet,
         student_text_encoder=student_text_encoder,
@@ -3449,14 +3449,14 @@ def train(
         num_training_steps=max_train_steps_tuning,
     )
 
-    # 特征对齐层配置
+    # Feature alignment layer configuration
     feature_alignment_unet_layers = [
         'down_blocks.0', 'down_blocks.1', 'down_blocks.2', 'down_blocks.3',
         'mid_block',
         'up_blocks.0', 'up_blocks.1', 'up_blocks.2', 'up_blocks.3'
     ]
 
-    # 调用多teacher LoRA微调函数
+    # Call multi-teacher LoRA fine-tuning function
     perform_tuning_multi_teacher(
         teacher_unets=teacher_unets,
         teacher_text_encoders=teacher_text_encoders,
@@ -3494,48 +3494,48 @@ def train(
         feature_only_steps=feature_only_steps,
     )
 
-    # --- 11. 训练完成总结 ---
+    # --- 11. Training completion summary ---
     print(f"\n{'='*80}")
-    print(f"多Teacher蒸馏训练完成！")
-    print(f"✅ 训练模式: {'基于Token的Teacher' if use_token_based_teachers else '基于LoRA文件的Teacher'}")
-    print(f"✅ 处理了 {num_lora_files} 个LoRA文件")
-    print(f"✅ 创建了 {num_teachers} 个Teachers")
-    print(f"✅ 学习了 {len(all_placeholder_tokens)} 个tokens")
-    print(f"✅ 优化模式: {'交替优化' if use_alternating_optimization else '联合优化'}")
+    print(f"Multi-Teacher distillation training completed!")
+    print(f"✅ Training mode: {'Token-based Teacher' if use_token_based_teachers else 'LoRA file-based Teacher'}")
+    print(f"✅ Processed {num_lora_files} LoRA files")
+    print(f"✅ Created {num_teachers} Teachers")
+    print(f"✅ Learned {len(all_placeholder_tokens)} tokens")
+    print(f"✅ Optimization mode: {'alternating' if use_alternating_optimization else 'joint'}")
     if use_token_based_teachers:
-        print(f"✅ Token-Teacher一对一映射，精细化训练")
+        print(f"✅ One-to-one Token-Teacher mapping, fine-grained training")
     else:
-        print(f"✅ LoRA-Teacher映射，批量token训练")
-    print(f"✅ 最终模型已保存到: {output_dir}")
+        print(f"✅ LoRA-Teacher mapping, batch token training")
+    print(f"✅ Final model saved to: {output_dir}")
     
-    # 生成训练总结报告
+    # Generate training summary report
     summary_report_path = os.path.join(output_dir, "training_summary.txt")
     try:
         with open(summary_report_path, 'w', encoding='utf-8') as f:
-            f.write("多Teacher LoRA蒸馏训练总结报告\n")
+            f.write("Multi-Teacher LoRA Distillation Training Summary Report\n")
             f.write("="*50 + "\n\n")
-            f.write(f"训练模式: {'基于Token的Teacher' if use_token_based_teachers else '基于LoRA文件的Teacher'}\n")
-            f.write(f"LoRA文件数量: {num_lora_files}\n")
-            f.write(f"Teacher数量: {num_teachers}\n")
-            f.write(f"Token数量: {len(all_placeholder_tokens)}\n")
-            f.write(f"Teacher选择策略: {teacher_selection_strategy}\n")
-            f.write(f"优化模式: {'交替优化' if use_alternating_optimization else '联合优化'}\n")
-            f.write(f"文本逆向训练: {'是' if perform_inversion else '否'}\n")
-            f.write(f"TI训练步数: {max_train_steps_ti}\n")
-            f.write(f"LoRA训练步数: {max_train_steps_tuning}\n")
-            f.write(f"特征对齐权重: {feature_align_weight}\n")
-            f.write(f"噪声预测权重: {noise_pred_weight}\n")
-            f.write("\n处理的Tokens:\n")
+            f.write(f"Training mode: {'Token-based Teacher' if use_token_based_teachers else 'LoRA file-based Teacher'}\n")
+            f.write(f"Number of LoRA files: {num_lora_files}\n")
+            f.write(f"Number of Teachers: {num_teachers}\n")
+            f.write(f"Number of tokens: {len(all_placeholder_tokens)}\n")
+            f.write(f"Teacher selection strategy: {teacher_selection_strategy}\n")
+            f.write(f"Optimization mode: {'alternating' if use_alternating_optimization else 'joint'}\n")
+            f.write(f"Textual inversion training: {'yes' if perform_inversion else 'no'}\n")
+            f.write(f"TI training steps: {max_train_steps_ti}\n")
+            f.write(f"LoRA training steps: {max_train_steps_tuning}\n")
+            f.write(f"Feature alignment weight: {feature_align_weight}\n")
+            f.write(f"Noise prediction weight: {noise_pred_weight}\n")
+            f.write("\nProcessed Tokens:\n")
             for i, token in enumerate(all_placeholder_tokens):
                 f.write(f"  {i+1}. {token}\n")
-            f.write(f"\n训练完成时间: {torch.cuda.get_device_name() if torch.cuda.is_available() else 'CPU'}\n")
-        print(f"✅ 训练总结报告已保存: {summary_report_path}")
+            f.write(f"\nTraining device: {torch.cuda.get_device_name() if torch.cuda.is_available() else 'CPU'}\n")
+        print(f"✅ Training summary report saved: {summary_report_path}")
     except Exception as e:
-        print(f"⚠️ 保存训练总结报告时出错: {e}")
+        print(f"⚠️ Error saving training summary report: {e}")
     
     print(f"{'='*80}")
 
-    # 清理资源
+    # Clean up resources
     if log_wandb:
         wandb.finish()
     
@@ -3552,23 +3552,23 @@ if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='Multi-Teacher LoRA Distillation Training')
     
-    # --- 主要参数 - 支持文件夹输入和向后兼容 ---
+    # --- Main parameters - support folder input and backward compatibility ---
     parser.add_argument('--lora_models_dir', type=str, default=None, 
                        help='Directory containing multiple LoRA model files (new multi-teacher mode)')
     
-    # 向后兼容参数
+    # Backward compatibility parameters
     parser.add_argument('--lora_path1', type=str, default=None, 
                        help='Path to first LoRA model (for backward compatibility)')
     parser.add_argument('--lora_path2', type=str, default=None, 
                        help='Path to second LoRA model (for backward compatibility)')
     
-    # 核心必需参数
+    # Core required parameters
     parser.add_argument('--pretrained_model_name_or_path', type=str, required=True, 
                        help='Path to pretrained model or HuggingFace model name')
     parser.add_argument('--output_dir', type=str, required=True, 
                        help='Output directory for saving models')
     
-    # --- 新增多teacher相关参数 ---
+    # --- New multi-teacher related parameters ---
     parser.add_argument('--teacher_selection_strategy', type=str, default='round_robin',
                        choices=['round_robin', 'weighted_random', 'adaptive'],
                        help='Strategy for selecting teachers during training')
@@ -3577,7 +3577,7 @@ if __name__ == '__main__':
     parser.add_argument('--auto_generate_placeholder_tokens', action='store_true', default=True,
                        help='Automatically generate placeholder tokens from LoRA filenames')
     
-    # --- 数据和模型配置 ---
+    # --- Data and model configuration ---
     parser.add_argument('--instance_data_dir', type=str, default="", 
                        help='Directory containing instance data')
     parser.add_argument('--train_text_encoder', action='store_true', default=True, 
@@ -3587,7 +3587,7 @@ if __name__ == '__main__':
     parser.add_argument('--revision', type=str, default=None, 
                        help='Revision of pretrained model')
     
-    # --- 训练模式配置 ---
+    # --- Training mode configuration ---
     parser.add_argument('--perform_inversion', action='store_true', default=False, 
                        help='Perform textual inversion training')
     parser.add_argument('--use_template', type=str, choices=[None, 'object', 'style'], default=None, 
@@ -3595,7 +3595,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_inpainting', action='store_true', default=False, 
                        help='Train for inpainting tasks')
     
-    # --- Placeholder Token 配置 ---
+    # --- Placeholder Token configuration ---
     parser.add_argument('--placeholder_tokens', type=str, default='', 
                        help='Manual placeholder tokens (fallback)')
     parser.add_argument('--placeholder_tokens1', type=str, default='', 
@@ -3607,7 +3607,7 @@ if __name__ == '__main__':
     parser.add_argument('--initializer_tokens', type=str, default=None, 
                        help='Initializer tokens')
     
-    # --- 基础训练参数 ---
+    # --- Basic training parameters ---
     parser.add_argument('--seed', type=int, default=42, 
                        help='Random seed for reproducibility')
     parser.add_argument('--resolution', type=int, default=512, 
@@ -3619,7 +3619,7 @@ if __name__ == '__main__':
     parser.add_argument('--sample_batch_size', type=int, default=1, 
                        help='Sampling batch size')
     
-    # --- 训练步数配置 ---
+    # --- Training steps configuration ---
     parser.add_argument('--max_train_steps_tuning', type=int, default=1000, 
                        help='Maximum number of LoRA tuning steps')
     parser.add_argument('--max_train_steps_ti', type=int, default=1000, 
@@ -3629,13 +3629,13 @@ if __name__ == '__main__':
     parser.add_argument('--gradient_accumulation_steps', type=int, default=4, 
                        help='Number of gradient accumulation steps')
     
-    # --- 模型优化配置 ---
+    # --- Model optimization configuration ---
     parser.add_argument('--gradient_checkpointing', action='store_true', default=False, 
                        help='Enable gradient checkpointing to save memory')
     parser.add_argument('--enable_xformers_memory_efficient_attention', action='store_true', default=False, 
                        help='Enable xformers memory efficient attention')
     
-    # --- LoRA 配置 ---
+    # --- LoRA configuration ---
     parser.add_argument('--lora_rank', type=int, default=4, 
                        help='LoRA rank (dimensionality)')
     parser.add_argument('--lora_unet_target_modules', type=str, 
@@ -3651,11 +3651,11 @@ if __name__ == '__main__':
     parser.add_argument('--use_extended_lora', action='store_true', default=False, 
                        help='Use extended LoRA modules')
     
-    # --- 文本嵌入配置 ---
+    # --- Text embedding configuration ---
     parser.add_argument('--clip_ti_decay', action='store_true', default=True, 
                        help='Enable CLIP textual inversion decay/regularization')
     
-    # --- 学习率配置 ---
+    # --- Learning rate configuration ---
     parser.add_argument('--learning_rate_unet', type=float, default=1e-4, 
                        help='Learning rate for UNet training')
     parser.add_argument('--learning_rate_text', type=float, default=1e-5, 
@@ -3665,7 +3665,7 @@ if __name__ == '__main__':
     parser.add_argument('--scale_lr', action='store_true', default=False, 
                        help='Scale learning rate by batch size and accumulation steps')
     
-    # --- 学习率调度器配置 ---
+    # --- Learning rate scheduler configuration ---
     parser.add_argument('--lr_scheduler', type=str, default='linear', 
                        choices=['linear', 'cosine', 'cosine_with_restarts', 'polynomial', 'constant', 'constant_with_warmup'],
                        help='Learning rate scheduler for textual inversion')
@@ -3677,13 +3677,13 @@ if __name__ == '__main__':
     parser.add_argument('--lr_warmup_steps_lora', type=int, default=0, 
                        help='Learning rate warmup steps for LoRA training')
     
-    # --- 继续训练配置 ---
+    # --- Continue training configuration ---
     parser.add_argument('--continue_inversion', action='store_true', default=False, 
                        help='Continue textual inversion during LoRA training')
     parser.add_argument('--continue_inversion_lr', type=float, default=None, 
                        help='Learning rate for continued textual inversion (if different from --learning_rate_ti)')
     
-    # --- 数据处理配置 ---
+    # --- Data processing configuration ---
     parser.add_argument('--use_face_segmentation_condition', action='store_true', default=False, 
                        help='Use face segmentation as conditioning')
     parser.add_argument('--cached_latents', action='store_true', default=True, 
@@ -3693,7 +3693,7 @@ if __name__ == '__main__':
     parser.add_argument('--mask_temperature', type=float, default=1.0, 
                        help='Temperature for mask processing')
     
-    # --- 优化器配置 ---
+    # --- Optimizer configuration ---
     parser.add_argument('--weight_decay_ti', type=float, default=0.00, 
                        help='Weight decay for textual inversion optimizer')
     parser.add_argument('--weight_decay_lora', type=float, default=0.001, 
@@ -3701,20 +3701,20 @@ if __name__ == '__main__':
     parser.add_argument('--use_8bit_adam', action='store_true', default=False, 
                        help='Use 8-bit Adam optimizer to save memory')
     
-    # --- 设备和精度配置 ---
+    # --- Device and precision configuration ---
     parser.add_argument('--device', type=str, default='cuda:0', 
                        help='Device to use for training (cuda:0, cuda:1, cpu, etc.)')
     parser.add_argument('--mixed_precision', type=str, default='no', 
                        choices=['no', 'fp16', 'bf16'],
                        help='Mixed precision training mode')
     
-    # --- 损失权重配置 ---
+    # --- Loss weight configuration ---
     parser.add_argument('--feature_align_weight', type=float, default=0.01, 
                        help='Weight for feature alignment loss')
     parser.add_argument('--noise_pred_weight', type=float, default=1.0, 
                        help='Weight for noise prediction loss')
     
-    # --- 日志和监控配置 ---
+    # --- Logging and monitoring configuration ---
     parser.add_argument('--log_wandb', action='store_true', default=False, 
                        help='Log training metrics to Weights & Biases')
     parser.add_argument('--wandb_log_prompt_cnt', type=int, default=10, 
@@ -3730,7 +3730,7 @@ if __name__ == '__main__':
     parser.add_argument('--tensorboard_log_dir', type=str, default='runs_new', 
                        help='Directory for TensorBoard logs')
     
-    # --- 特征对齐配置 ---
+    # --- Feature alignment configuration ---
     parser.add_argument('--unet_feature_align_weight', type=float, default=0.01, 
                        help='Weight for UNet feature alignment loss')
     parser.add_argument('--text_encoder_feature_align_weight', type=float, default=0.02, 
@@ -3748,7 +3748,7 @@ if __name__ == '__main__':
                        choices=['mse', 'l1', 'cosine'],
                        help='Loss type for text encoder feature alignment')
     
-    # --- 其他高级配置 ---
+    # --- Other advanced configuration ---
     parser.add_argument('--t_multiplier_loss', type=float, default=1.0, 
                        help='Multiplier for timestep sampling in loss calculation')
     parser.add_argument('--save_image_every_n_steps_loss', type=int, default=200, 
@@ -3758,27 +3758,27 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     
-    # --- 参数验证和处理 ---
+    # --- Parameter validation and processing ---
     
-    # 验证必需的输入参数
+    # Validate required input parameters
     if not args.lora_models_dir and not (args.lora_path1 and args.lora_path2):
-        parser.error("必须提供 --lora_models_dir 或者同时提供 --lora_path1 和 --lora_path2")
+        parser.error("Must provide --lora_models_dir or both --lora_path1 and --lora_path2")
     
     if args.lora_models_dir and (args.lora_path1 or args.lora_path2):
-        print("警告: 同时提供了 --lora_models_dir 和单独的 lora_path 参数。将优先使用 --lora_models_dir")
+        print("Warning: Both --lora_models_dir and individual lora_path arguments provided. --lora_models_dir will take priority")
         args.lora_path1 = None
         args.lora_path2 = None
     
-    # 处理 teacher_weights 参数
+    # Process teacher_weights parameter
     teacher_weights = None
     if args.teacher_weights:
         try:
             teacher_weights = [float(w.strip()) for w in args.teacher_weights.split(',')]
-            print(f"使用教师权重: {teacher_weights}")
+            print(f"Using teacher weights: {teacher_weights}")
         except ValueError:
-            parser.error("teacher_weights 必须是逗号分隔的浮点数，例如: '0.3,0.4,0.3'")
+            parser.error("teacher_weights must be comma-separated floats, e.g.: '0.3,0.4,0.3'")
     
-    # 处理 LoRA 目标模块参数
+    # Process LoRA target module parameters
     if isinstance(args.lora_unet_target_modules, str):
         lora_unet_target_modules = set(args.lora_unet_target_modules.split(','))
     else:
@@ -3789,7 +3789,7 @@ if __name__ == '__main__':
     else:
         lora_clip_target_modules = args.lora_clip_target_modules
     
-    # 处理特征对齐层参数
+    # Process feature alignment layer parameters
     if isinstance(args.unet_feature_alignment_layers, str):
         unet_feature_alignment_layers = args.unet_feature_alignment_layers.split(',')
     else:
@@ -3800,13 +3800,13 @@ if __name__ == '__main__':
     else:
         text_encoder_alignment_layers = args.text_encoder_alignment_layers
     
-    # 验证teacher选择策略
+    # Validate teacher selection strategy
     if args.teacher_selection_strategy == 'weighted_random' and teacher_weights is None:
-        print("警告: 使用 weighted_random 策略但未提供 teacher_weights，将使用均匀权重")
+        print("Warning: Using weighted_random strategy without teacher_weights, uniform weights will be used")
     
-    # 创建完整的参数字典
+    # Create complete parameter dictionary
     train_args = {
-        # 主要参数
+        # Main parameters
         'lora_models_dir': args.lora_models_dir,
         'lora_path1': args.lora_path1,
         'lora_path2': args.lora_path2,
@@ -3814,12 +3814,12 @@ if __name__ == '__main__':
         'pretrained_model_name_or_path': args.pretrained_model_name_or_path,
         'output_dir': args.output_dir,
         
-        # 多teacher配置
+        # Multi-teacher configuration
         'teacher_selection_strategy': args.teacher_selection_strategy,
         'teacher_weights': teacher_weights,
         'auto_generate_placeholder_tokens': args.auto_generate_placeholder_tokens,
         
-        # 模型和训练配置
+        # Model and training configuration
         'train_text_encoder': args.train_text_encoder,
         'pretrained_vae_name_or_path': args.pretrained_vae_name_or_path,
         'revision': args.revision,
@@ -3827,14 +3827,14 @@ if __name__ == '__main__':
         'use_template': args.use_template,
         'train_inpainting': args.train_inpainting,
         
-        # Token配置
+        # Token configuration
         'placeholder_tokens': args.placeholder_tokens,
         'placeholder_tokens1': args.placeholder_tokens1,
         'placeholder_tokens2': args.placeholder_tokens2,
         'placeholder_token_at_data': args.placeholder_token_at_data,
         'initializer_tokens': args.initializer_tokens,
         
-        # 基础训练参数
+        # Basic training parameters
         'seed': args.seed,
         'resolution': args.resolution,
         'color_jitter': args.color_jitter,
@@ -3846,7 +3846,7 @@ if __name__ == '__main__':
         'gradient_accumulation_steps': args.gradient_accumulation_steps,
         'gradient_checkpointing': args.gradient_checkpointing,
         
-        # LoRA配置
+        # LoRA configuration
         'lora_rank': args.lora_rank,
         'lora_unet_target_modules': lora_unet_target_modules,
         'lora_clip_target_modules': lora_clip_target_modules,
@@ -3855,7 +3855,7 @@ if __name__ == '__main__':
         'use_extended_lora': args.use_extended_lora,
         'clip_ti_decay': args.clip_ti_decay,
         
-        # 学习率配置
+        # Learning rate configuration
         'learning_rate_unet': args.learning_rate_unet,
         'learning_rate_text': args.learning_rate_text,
         'learning_rate_ti': args.learning_rate_ti,
@@ -3867,27 +3867,27 @@ if __name__ == '__main__':
         'lr_scheduler_lora': args.lr_scheduler_lora,
         'lr_warmup_steps_lora': args.lr_warmup_steps_lora,
         
-        # 数据处理配置
+        # Data processing configuration
         'use_face_segmentation_condition': args.use_face_segmentation_condition,
         'cached_latents': args.cached_latents,
         'use_mask_captioned_data': args.use_mask_captioned_data,
         'mask_temperature': args.mask_temperature,
         
-        # 优化器配置
+        # Optimizer configuration
         'weight_decay_ti': args.weight_decay_ti,
         'weight_decay_lora': args.weight_decay_lora,
         'use_8bit_adam': args.use_8bit_adam,
         
-        # 设备和系统配置
+        # Device and system configuration
         'device': args.device,
-        'extra_args': None,  # 可以在这里添加额外参数
+        'extra_args': None,  # Additional parameters can be added here
         'enable_xformers_memory_efficient_attention': args.enable_xformers_memory_efficient_attention,
         
-        # 损失权重
+        # Loss weights
         'feature_align_weight': args.feature_align_weight,
         'noise_pred_weight': args.noise_pred_weight,
         
-        # 日志配置
+        # Logging configuration
         'log_wandb': args.log_wandb,
         'wandb_log_prompt_cnt': args.wandb_log_prompt_cnt,
         'wandb_project_name': args.wandb_project_name,
@@ -3896,42 +3896,42 @@ if __name__ == '__main__':
         'out_name': args.out_name,
     }
     
-    # 显示配置摘要
+    # Display configuration summary
     print("\n" + "="*80)
-    print("多Teacher LoRA蒸馏训练配置摘要")
+    print("Multi-Teacher LoRA Distillation Training Configuration Summary")
     print("="*80)
     
     if args.lora_models_dir:
-        print(f"模式: 多Teacher文件夹模式")
-        print(f"LoRA模型目录: {args.lora_models_dir}")
+        print(f"Mode: Multi-Teacher folder mode")
+        print(f"LoRA model directory: {args.lora_models_dir}")
     else:
-        print(f"模式: 双Teacher兼容模式")
-        print(f"LoRA路径1: {args.lora_path1}")
-        print(f"LoRA路径2: {args.lora_path2}")
+        print(f"Mode: Dual-Teacher compatibility mode")
+        print(f"LoRA path 1: {args.lora_path1}")
+        print(f"LoRA path 2: {args.lora_path2}")
     
-    print(f"基础模型: {args.pretrained_model_name_or_path}")
-    print(f"输出目录: {args.output_dir}")
-    print(f"Teacher选择策略: {args.teacher_selection_strategy}")
+    print(f"Base model: {args.pretrained_model_name_or_path}")
+    print(f"Output directory: {args.output_dir}")
+    print(f"Teacher selection strategy: {args.teacher_selection_strategy}")
     if teacher_weights:
-        print(f"Teacher权重: {teacher_weights}")
-    print(f"自动生成tokens: {args.auto_generate_placeholder_tokens}")
-    print(f"执行文本逆向: {args.perform_inversion}")
-    print(f"训练批次大小: {args.train_batch_size}")
-    print(f"TI训练步数: {args.max_train_steps_ti}")
-    print(f"LoRA训练步数: {args.max_train_steps_tuning}")
-    print(f"设备: {args.device}")
-    print(f"特征对齐权重: {args.feature_align_weight}")
+        print(f"Teacher weights: {teacher_weights}")
+    print(f"Auto-generate tokens: {args.auto_generate_placeholder_tokens}")
+    print(f"Perform textual inversion: {args.perform_inversion}")
+    print(f"Training batch size: {args.train_batch_size}")
+    print(f"TI training steps: {args.max_train_steps_ti}")
+    print(f"LoRA training steps: {args.max_train_steps_tuning}")
+    print(f"Device: {args.device}")
+    print(f"Feature alignment weight: {args.feature_align_weight}")
     print("="*80)
     
-    # 运行训练
+    # Run training
     try:
-        print("开始多Teacher蒸馏训练...")
+        print("Starting multi-Teacher distillation training...")
         train(**train_args)
         print("\n" + "="*80)
-        print("训练完成！")
+        print("Training completed!")
         print("="*80)
     except Exception as e:
-        print(f"\n训练过程中发生错误: {e}")
+        print(f"\nError occurred during training: {e}")
         import traceback
         traceback.print_exc()
         exit(1)
