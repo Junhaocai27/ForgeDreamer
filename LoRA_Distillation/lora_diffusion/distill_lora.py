@@ -33,7 +33,7 @@ import wandb
 import fire
 import sys
 from torchvision.utils import save_image
-from diffusers import StableDiffusionPipeline, EulerAncestralDiscreteScheduler
+from diffusers import EulerAncestralDiscreteScheduler
 from torch.utils.tensorboard import SummaryWriter
 from feature_hook_unet import FeatureAlignmentLoss, UNetFeatureExtractor, create_enhanced_feature_alignment_loss, create_hybrid_unet_alignment_loss
 from feature_hook_text_encoder import TextEncoderFeatureExtractor, TextEncoderFeatureAlignmentLoss, create_hybrid_text_encoder_alignment_loss
@@ -123,10 +123,7 @@ def text2img_dataloader_combined_with_latent_caching(
     num_workers: int = 0,
     # vae_scaling_factor: float = 0.18215 # Can be passed as a parameter, or obtained from vae.config
 ):
-    """
-    Creates a DataLoader, with latent caching directly imitating the non-leaking snippet.
-    - Modifies the original dataset item directly when caching latents.
-    """
+    """Creates a DataLoader with optional latent caching."""
 
     dataset_to_load = train_dataset
 
@@ -138,14 +135,11 @@ def text2img_dataloader_combined_with_latent_caching(
         
         # Use the device where the VAE resides for operations
         current_vae_device = vae.device 
-        # Get scaling factor
-        scaling_factor = getattr(vae.config, "scaling_factor", 0.18215) # Consistent with the "no leak" code
+        scaling_factor = getattr(vae.config, "scaling_factor", 0.18215)
 
         cached_dataset_items = [] # Store modified dataset items
 
         for i in tqdm(range(len(train_dataset)), desc="Caching latents (direct imitation)"):
-            # 1. Get the original item from the dataset
-            # 'item_from_dataset' is a dictionary.
             item_from_dataset = train_dataset[i] 
             
             if "instance_images" not in item_from_dataset:
@@ -153,39 +147,30 @@ def text2img_dataloader_combined_with_latent_caching(
 
             pixel_values = item_from_dataset["instance_images"] 
 
-            # Ensure pixel_values is a tensor (no PIL conversion here, assuming dataset returns tensors)
             if not isinstance(pixel_values, torch.Tensor):
                 raise TypeError(
                     f"Expected 'instance_images' to be a torch.Tensor for direct imitation, got {type(pixel_values)}. "
                     "If dataset returns PIL, pre-processing is needed or use the 'fixed' version."
                 )
             
-            # Prepare VAE input: add batch dimension, move to VAE device, convert data type
             input_pixels_for_vae = pixel_values.unsqueeze(0).to(device=current_vae_device, dtype=vae.dtype)
 
-            # 2. Encode to latents using VAE (within no_grad context)
             with torch.no_grad():
                 latents_on_vae_device = vae.encode(input_pixels_for_vae).latent_dist.sample()
             
             latents_on_vae_device = latents_on_vae_device * scaling_factor
             
-            # 3. Move latents to CPU and remove batch dimension
             latents_on_cpu = latents_on_vae_device.squeeze(0).cpu()
             
-            # 4. DIRECTLY MODIFY the item from dataset
             item_from_dataset["instance_images"] = latents_on_cpu
             
-            # 5. Add the MODIFIED item to the list
             cached_dataset_items.append(item_from_dataset)
-
-            # Note: no explicit del or torch.cuda.empty_cache() here, strictly mimicking
         
         dataset_to_load = cached_dataset_items
         print("Latent caching (direct imitation) complete.")
     else:
         print("Using pixel values directly from the dataset (no latent caching).")
 
-    # --- Collate function (same as previous version) ---
     def collate_fn(examples):
         batch = {}
         if not examples:
@@ -270,6 +255,84 @@ def text2img_dataloader_combined_with_latent_caching(
     print(f"DataLoader configured. Batches will contain '{data_type_in_pixel_values}' in 'pixel_values' key.")
     return train_dataloader
 
+def _save_debug_images(student_pred_noise, latents_gt_x0, noisy_latents, timesteps, vae,
+                       scheduler, global_step, save_image_every_n_steps, output_dir_for_loss_step,
+                       current_teacher_name, current_teacher_idx, base_save_dir,
+                       save_comparison_grid, loss_val, batch):
+    if global_step % save_image_every_n_steps != 0 or save_image_every_n_steps <= 0:
+        return
+    vae_decode_input_dtype = torch.float32
+    with torch.no_grad():
+        latents_gt_x0_viz = latents_gt_x0[0:1].detach()
+        student_pred_noise_viz = student_pred_noise[0:1].detach()
+        noisy_latents_viz = noisy_latents[0:1].detach()
+        timestep_viz = timesteps[0:1].detach()
+        current_timestep_int = timestep_viz.item() if timestep_viz.numel() == 1 else timestep_viz[0].item()
+        scheduler_output_student = scheduler.step(
+            model_output=student_pred_noise_viz.to(dtype=noisy_latents_viz.dtype),
+            timestep=torch.tensor([current_timestep_int], device=noisy_latents_viz.device) if not isinstance(current_timestep_int, int) else current_timestep_int,
+            sample=noisy_latents_viz
+        )
+        pred_x0_latent_student = scheduler_output_student.pred_original_sample
+        scaling_factor = getattr(vae.config, "scaling_factor", 0.18215)
+        pred_x0_latent_student_for_vae = pred_x0_latent_student.to(dtype=vae_decode_input_dtype) / scaling_factor
+        latent_x0_gt_viz_for_vae = latents_gt_x0_viz.to(dtype=vae_decode_input_dtype) / scaling_factor
+        noisy_input_latent_for_vae = noisy_latents_viz.to(dtype=vae_decode_input_dtype) / scaling_factor
+        vae_internal_dtype = vae.dtype if hasattr(vae, 'dtype') else torch.float32
+        with torch.cuda.amp.autocast(enabled=False):
+            pred_image_student = vae.decode(pred_x0_latent_student_for_vae.to(device=vae.device, dtype=vae_internal_dtype)).sample
+            gt_image = vae.decode(latent_x0_gt_viz_for_vae.to(device=vae.device, dtype=vae_internal_dtype)).sample
+            noisy_input_image = vae.decode(noisy_input_latent_for_vae.to(device=vae.device, dtype=vae_internal_dtype)).sample
+        pred_image_student = (pred_image_student / 2 + 0.5).clamp(0, 1)
+        gt_image = (gt_image / 2 + 0.5).clamp(0, 1)
+        noisy_input_image = (noisy_input_image / 2 + 0.5).clamp(0, 1)
+        clean_teacher_name = re.sub(r'[^\w\-_.]', '_', current_teacher_name)
+        if base_save_dir:
+            teacher_save_dir = os.path.join(base_save_dir, f"teacher_{current_teacher_idx+1:02d}_{clean_teacher_name}")
+        else:
+            teacher_save_dir = os.path.join(output_dir_for_loss_step, f"teacher_{current_teacher_idx+1:02d}_{clean_teacher_name}")
+        subdirs = {
+            'student_pred': os.path.join(teacher_save_dir, 'student_predictions'),
+            'ground_truth': os.path.join(teacher_save_dir, 'ground_truth'),
+            'noisy_input': os.path.join(teacher_save_dir, 'noisy_inputs'),
+            'comparisons': os.path.join(teacher_save_dir, 'comparisons')
+        }
+        for subdir in subdirs.values():
+            if not os.path.exists(subdir):
+                os.makedirs(subdir, exist_ok=True)
+        t_val = current_timestep_int
+        timestamp_suffix = f"step_{global_step:06d}_t{t_val:03d}"
+        text_info = ""
+        if "raw_text" in batch and batch["raw_text"]:
+            raw_text = batch["raw_text"][0] if isinstance(batch["raw_text"], list) else str(batch["raw_text"])
+            clean_text = re.sub(r'[^\w\s\-_.]', '', raw_text)[:20]
+            text_info = f"_{clean_text.replace(' ', '_')}" if clean_text else ""
+        student_pred_filename = f"{timestamp_suffix}_from_{clean_teacher_name}{text_info}.png"
+        student_pred_path = os.path.join(subdirs['student_pred'], student_pred_filename)
+        save_image(pred_image_student, student_pred_path)
+        gt_filename = f"{timestamp_suffix}_gt{text_info}.png"
+        gt_path = os.path.join(subdirs['ground_truth'], gt_filename)
+        save_image(gt_image, gt_path)
+        noisy_filename = f"{timestamp_suffix}_noisy{text_info}.png"
+        noisy_path = os.path.join(subdirs['noisy_input'], noisy_filename)
+        save_image(noisy_input_image, noisy_path)
+        if save_comparison_grid:
+            try:
+                import torchvision.utils as vutils
+                comparison_images = torch.cat([noisy_input_image, pred_image_student, gt_image], dim=0)
+                grid = vutils.make_grid(comparison_images, nrow=3, padding=2, normalize=False, pad_value=1.0)
+                comparison_filename = f"{timestamp_suffix}_comparison_from_{clean_teacher_name}{text_info}.png"
+                comparison_path = os.path.join(subdirs['comparisons'], comparison_filename)
+                save_image(grid.unsqueeze(0), comparison_path)
+            except ImportError:
+                print("Warning: torchvision.utils not available, skipping comparison grid")
+            except Exception as e:
+                print(f"Warning: Error saving comparison grid: {e}")
+        print(f"[Step {global_step:06d}] Saved images for Teacher {current_teacher_idx+1} ({current_teacher_name}) dir={teacher_save_dir} t={t_val} loss={loss_val:.6f}")
+        index_file_path = os.path.join(teacher_save_dir, "save_index.txt")
+        with open(index_file_path, "a", encoding='utf-8') as f:
+            f.write(f"{global_step:06d},{t_val:03d},{loss_val:.6f},{clean_teacher_name},{timestamp_suffix}\n")
+
 def loss_step_gaussian_noise(
     batch,
     student_unet,
@@ -288,28 +351,13 @@ def loss_step_gaussian_noise(
     base_save_dir: str = None,
     save_comparison_grid: bool = False,  # Whether to save comparison grid image
 ):
-    """
-    Compute Gaussian noise prediction loss and save student model prediction results
-    
-    New features:
-    - Save prediction results categorized by teacher
-    - Create independent save directory for each teacher
-    - Include teacher information in file names
-    - Optional comparison grid image saving
-    
-    Args:
-        current_teacher_name: Name of the current teacher
-        current_teacher_idx: Index of the current teacher
-        base_save_dir: Base save directory (if None, uses output_dir_for_loss_step)
-        save_comparison_grid: Whether to save grid image containing all comparisons
-    """
+    """Compute Gaussian noise prediction loss and optionally save debug images."""
     weight_dtype = torch.float32
     if mixed_precision:
         vae_decode_input_dtype = torch.float32
     else:
         vae_decode_input_dtype = torch.float32
 
-    # Process latent variables
     if batch["pixel_values"].ndim == 4 and batch["pixel_values"].shape[1] in [1, 3, 4]:
         latents_gt_x0 = batch["pixel_values"].to(device=student_unet.device, dtype=weight_dtype)
     else:
@@ -317,7 +365,6 @@ def loss_step_gaussian_noise(
 
     bsz = latents_gt_x0.shape[0]
 
-    # Sample a random timestep for each image
     timesteps = torch.randint(
         0,
         int(scheduler.config.num_train_timesteps * t_mutliplier),
@@ -326,17 +373,14 @@ def loss_step_gaussian_noise(
     )
     timesteps = timesteps.long()
 
-    # Sample noise
     noise = torch.randn_like(latents_gt_x0)
     noisy_latents = scheduler.add_noise(latents_gt_x0, noise, timesteps)
 
-    # Prepare UNet input
     if mixed_precision:
         student_unet_input_latents = noisy_latents.to(dtype=torch.float16)
     else:
         student_unet_input_latents = noisy_latents.to(dtype=torch.float32)
 
-    # --- Student model text encoding section ---
     student_input_ids = batch.get("aux1_input_ids")
     if student_input_ids is None:
         student_input_ids = batch["input_ids"]
@@ -350,7 +394,6 @@ def loss_step_gaussian_noise(
     if hasattr(student_text_encoder, 'dtype') and student_text_encoder.dtype == torch.float16:
          student_text_encoder_output_dtype_for_autocast = torch.float16
 
-    # Text encoding (supports mixed precision)
     if mixed_precision and student_text_encoder_output_dtype_for_autocast == torch.float16:
         with torch.cuda.amp.autocast(enabled=True):
             student_encoder_hidden_states = student_text_encoder(
@@ -363,7 +406,6 @@ def loss_step_gaussian_noise(
         unet_expected_dtype = student_unet.dtype if hasattr(student_unet, 'dtype') else weight_dtype
         student_encoder_hidden_states = _temp_states.to(dtype=unet_expected_dtype)
 
-    # --- Student model UNet noise prediction ---
     student_unet_internal_dtype = student_unet.dtype if hasattr(student_unet, 'dtype') else weight_dtype
     student_encoder_hidden_states_for_unet = student_encoder_hidden_states.to(dtype=student_unet_internal_dtype)
 
@@ -383,7 +425,6 @@ def loss_step_gaussian_noise(
 
     target_noise = noise
 
-    # Process mask (if exists)
     if batch.get("mask", None) is not None:
         mask = batch["mask"].to(student_pred_noise.device)
         if mask.ndim == 3:
@@ -398,138 +439,12 @@ def loss_step_gaussian_noise(
         student_pred_noise = student_pred_noise * mask
         target_noise = target_noise * mask
 
-    # Compute loss
     loss = F.mse_loss(student_pred_noise.float(), target_noise.float(), reduction="none").mean([1, 2, 3]).mean()
 
-    # --- Optimized save logic ---
-    if global_step % save_image_every_n_steps == 0 and save_image_every_n_steps > 0:
-        with torch.no_grad():
-            latents_gt_x0_viz = latents_gt_x0[0:1].detach()
-            student_pred_noise_viz = student_pred_noise[0:1].detach()
-            noisy_latents_viz = noisy_latents[0:1].detach()
-            timestep_viz = timesteps[0:1].detach()
-
-            current_timestep_int = timestep_viz.item() if timestep_viz.numel() == 1 else timestep_viz[0].item()
-
-            # Reconstruct x0 from student predicted noise
-            scheduler_output_student = scheduler.step(
-                model_output=student_pred_noise_viz.to(dtype=noisy_latents_viz.dtype),
-                timestep=torch.tensor([current_timestep_int], device=noisy_latents_viz.device) if not isinstance(current_timestep_int, int) else current_timestep_int,
-                sample=noisy_latents_viz
-            )
-            pred_x0_latent_student = scheduler_output_student.pred_original_sample
-
-            # VAE decoding preparation
-            scaling_factor = getattr(vae.config, "scaling_factor", 0.18215)
-            pred_x0_latent_student_for_vae = pred_x0_latent_student.to(dtype=vae_decode_input_dtype) / scaling_factor
-            latent_x0_gt_viz_for_vae = latents_gt_x0_viz.to(dtype=vae_decode_input_dtype) / scaling_factor
-            noisy_input_latent_for_vae = noisy_latents_viz.to(dtype=vae_decode_input_dtype) / scaling_factor
-
-            vae_internal_dtype = vae.dtype if hasattr(vae, 'dtype') else torch.float32
-            
-            # VAE decoding
-            with torch.cuda.amp.autocast(enabled=False):
-                pred_image_student = vae.decode(pred_x0_latent_student_for_vae.to(device=vae.device, dtype=vae_internal_dtype)).sample
-                gt_image = vae.decode(latent_x0_gt_viz_for_vae.to(device=vae.device, dtype=vae_internal_dtype)).sample
-                noisy_input_image = vae.decode(noisy_input_latent_for_vae.to(device=vae.device, dtype=vae_internal_dtype)).sample
-
-            # Post-process images
-            pred_image_student = (pred_image_student / 2 + 0.5).clamp(0, 1)
-            gt_image = (gt_image / 2 + 0.5).clamp(0, 1)
-            noisy_input_image = (noisy_input_image / 2 + 0.5).clamp(0, 1)
-
-            # --- Create save directory structure categorized by teacher ---
-            # Clean teacher name, remove characters that may cause filesystem issues
-            clean_teacher_name = re.sub(r'[^\w\-_.]', '_', current_teacher_name)
-            
-            if base_save_dir:
-                # Use the provided base directory
-                teacher_save_dir = os.path.join(base_save_dir, f"teacher_{current_teacher_idx+1:02d}_{clean_teacher_name}")
-            else:
-                # Use the default directory
-                teacher_save_dir = os.path.join(output_dir_for_loss_step, f"teacher_{current_teacher_idx+1:02d}_{clean_teacher_name}")
-            
-            # Create subdirectories for different types of images
-            subdirs = {
-                'student_pred': os.path.join(teacher_save_dir, 'student_predictions'),
-                'ground_truth': os.path.join(teacher_save_dir, 'ground_truth'),
-                'noisy_input': os.path.join(teacher_save_dir, 'noisy_inputs'),
-                'comparisons': os.path.join(teacher_save_dir, 'comparisons')
-            }
-            
-            for subdir in subdirs.values():
-                if not os.path.exists(subdir):
-                    os.makedirs(subdir, exist_ok=True)
-
-            # --- Generate file names with timestamps and detailed info ---
-            t_val = current_timestep_int
-            timestamp_suffix = f"step_{global_step:06d}_t{t_val:03d}"
-            
-            # Get text information for the current batch (if available)
-            text_info = ""
-            if "raw_text" in batch and batch["raw_text"]:
-                # Clean text for file name
-                raw_text = batch["raw_text"][0] if isinstance(batch["raw_text"], list) else str(batch["raw_text"])
-                clean_text = re.sub(r'[^\w\s\-_.]', '', raw_text)[:20]  # Limit length
-                text_info = f"_{clean_text.replace(' ', '_')}" if clean_text else ""
-            
-            # --- Save various types of images ---
-            # 1. Student prediction results
-            student_pred_filename = f"{timestamp_suffix}_from_{clean_teacher_name}{text_info}.png"
-            student_pred_path = os.path.join(subdirs['student_pred'], student_pred_filename)
-            save_image(pred_image_student, student_pred_path)
-            
-            # 2. Ground truth images
-            gt_filename = f"{timestamp_suffix}_gt{text_info}.png"
-            gt_path = os.path.join(subdirs['ground_truth'], gt_filename)
-            save_image(gt_image, gt_path)
-            
-            # 3. Noisy input
-            noisy_filename = f"{timestamp_suffix}_noisy{text_info}.png"
-            noisy_path = os.path.join(subdirs['noisy_input'], noisy_filename)
-            save_image(noisy_input_image, noisy_path)
-            
-            # --- 4. Optional: create comparison grid image ---
-            if save_comparison_grid:
-                try:
-                    import torchvision.utils as vutils
-                    
-                    # Create comparison grid: [noisy input, student prediction, ground truth]
-                    comparison_images = torch.cat([noisy_input_image, pred_image_student, gt_image], dim=0)
-                    
-                    # Create grid image
-                    grid = vutils.make_grid(
-                        comparison_images, 
-                        nrow=3, 
-                        padding=2, 
-                        normalize=False,
-                        pad_value=1.0  # White border
-                    )
-                    
-                    comparison_filename = f"{timestamp_suffix}_comparison_from_{clean_teacher_name}{text_info}.png"
-                    comparison_path = os.path.join(subdirs['comparisons'], comparison_filename)
-                    save_image(grid.unsqueeze(0), comparison_path)
-                    
-                except ImportError:
-                    print("Warning: torchvision.utils not available, skipping comparison grid image saving")
-                except Exception as e:
-                    print(f"Warning: Error saving comparison grid image: {e}")
-            
-            # --- Log detailed save information ---
-            print(f"[Step {global_step:06d}] Saved prediction results for Teacher {current_teacher_idx+1} ({current_teacher_name}):")
-            print(f"  📁 Save directory: {teacher_save_dir}")
-            print(f"  🎯 Student prediction: {os.path.basename(student_pred_path)}")
-            print(f"  ✅ Ground truth: {os.path.basename(gt_path)}")
-            print(f"  🔀 Noisy input: {os.path.basename(noisy_path)}")
-            if save_comparison_grid:
-                print(f"  📊 Comparison grid: {os.path.basename(comparison_path)}")
-            print(f"  ⏰ Timestep: {t_val}, Loss: {loss.item():.6f}")
-            
-            # --- Optional: create index file for subsequent analysis ---
-            index_file_path = os.path.join(teacher_save_dir, "save_index.txt")
-            with open(index_file_path, "a", encoding='utf-8') as f:
-                f.write(f"{global_step:06d},{t_val:03d},{loss.item():.6f},{clean_teacher_name},{timestamp_suffix}\n")
-    
+    _save_debug_images(student_pred_noise, latents_gt_x0, noisy_latents, timesteps, vae,
+                       scheduler, global_step, save_image_every_n_steps,
+                       output_dir_for_loss_step, current_teacher_name, current_teacher_idx,
+                       base_save_dir, save_comparison_grid, loss.item(), batch)
     return loss
 
 def select_current_teacher(
@@ -539,19 +454,7 @@ def select_current_teacher(
     weights: Optional[List[float]] = None,
     selection_index: int = 0
 ) -> int:
-    """
-    Select the teacher model to use for the current step
-    
-    Args:
-        global_step: Current global step count
-        num_teachers: Number of teachers
-        strategy: Selection strategy
-        weights: Teacher weights (for weighted_random)
-        selection_index: Current selection index (for round_robin)
-    
-    Returns:
-        Selected teacher index
-    """
+    """Select the teacher index for the current step."""
     if strategy == "round_robin":
         return global_step % num_teachers
     
@@ -563,12 +466,70 @@ def select_current_teacher(
         return torch.multinomial(weights, 1).item()
     
     elif strategy == "adaptive":
-        # Can adaptively select based on loss history and other information
-        # Implementing a simple version here, can be extended later
         return global_step % num_teachers
     
     else:
         raise ValueError(f"Unknown teacher selection strategy: {strategy}")
+
+def _log_scalar_safe(writer, tag, value, step):
+    """Log a scalar to TensorBoard, safely handling int/float/Tensor/str types."""
+    if writer is None:
+        return
+    if isinstance(value, (int, float)):
+        writer.add_scalar(tag, value, step)
+    elif isinstance(value, torch.Tensor):
+        if value.numel() == 1:
+            writer.add_scalar(tag, value.item(), step)
+    elif isinstance(value, str):
+        try:
+            writer.add_scalar(tag, float(value), step)
+        except (ValueError, TypeError):
+            pass
+
+def _log_layer_losses(writer, unet_prefix, text_prefix, teacher_unet_prefix,
+                      teacher_text_prefix, unet_info, text_info, teacher_name, step):
+    """Log per-layer hybrid feature losses to TensorBoard."""
+    _CONFIG_STRINGS = {'hybrid', 'mse', 'cosine', 'scale_aware_cosine', 'layer_adaptive'}
+    if isinstance(unet_info, dict):
+        for layer_name, layer_loss in unet_info.items():
+            clean = layer_name.replace(".", "_")
+            if isinstance(layer_loss, (int, float)):
+                writer.add_scalar(f'{unet_prefix}/{clean}', layer_loss, step)
+                writer.add_scalar(f'{teacher_unet_prefix}/{teacher_name}/{clean}', layer_loss, step)
+            elif isinstance(layer_loss, torch.Tensor) and layer_loss.numel() == 1:
+                v = layer_loss.item()
+                writer.add_scalar(f'{unet_prefix}/{clean}', v, step)
+                writer.add_scalar(f'{teacher_unet_prefix}/{teacher_name}/{clean}', v, step)
+            elif isinstance(layer_loss, str):
+                try:
+                    v = float(layer_loss)
+                    writer.add_scalar(f'{unet_prefix}/{clean}', v, step)
+                    writer.add_scalar(f'{teacher_unet_prefix}/{teacher_name}/{clean}', v, step)
+                except (ValueError, TypeError):
+                    if layer_loss not in _CONFIG_STRINGS:
+                        print(f"Warning: skipping non-numeric loss: {layer_name}={layer_loss}")
+            elif isinstance(layer_loss, torch.Tensor):
+                print(f"Warning: skipping non-scalar tensor loss: {layer_name} shape={layer_loss.shape}")
+    if isinstance(text_info, dict):
+        for layer_name, layer_loss in text_info.items():
+            clean = layer_name.replace(".", "_")
+            if isinstance(layer_loss, (int, float)):
+                writer.add_scalar(f'{text_prefix}/{clean}', layer_loss, step)
+                writer.add_scalar(f'{teacher_text_prefix}/{teacher_name}/{clean}', layer_loss, step)
+            elif isinstance(layer_loss, torch.Tensor) and layer_loss.numel() == 1:
+                v = layer_loss.item()
+                writer.add_scalar(f'{text_prefix}/{clean}', v, step)
+                writer.add_scalar(f'{teacher_text_prefix}/{teacher_name}/{clean}', v, step)
+            elif isinstance(layer_loss, str):
+                try:
+                    v = float(layer_loss)
+                    writer.add_scalar(f'{text_prefix}/{clean}', v, step)
+                    writer.add_scalar(f'{teacher_text_prefix}/{teacher_name}/{clean}', v, step)
+                except (ValueError, TypeError):
+                    if layer_loss not in _CONFIG_STRINGS:
+                        print(f"Warning: skipping non-numeric loss: {layer_name}={layer_loss}")
+            elif isinstance(layer_loss, torch.Tensor):
+                print(f"Warning: skipping non-scalar tensor loss: {layer_name} shape={layer_loss.shape}")
 
 def train_inversion_with_multi_feature_alignment(
     # --- "Teacher" model parameters (changed to list form) ---
@@ -649,19 +610,7 @@ def train_inversion_with_multi_feature_alignment(
     teacher_selection_strategy: str = "round_robin",  # New: teacher selection strategy
     teacher_weights: Optional[List[float]] = None,  # New: teacher weights
 ):
-    """
-    train_inversion_with_multi_feature_alignment function:
-    Enhanced text inversion training supporting multiple teachers, using hybrid feature alignment for both UNet and Text Encoder.
-    
-    🔥 New features:
-    1. Support for arbitrary number of teacher models
-    2. UNet inter-layer hybrid feature alignment (MSE + Cosine)
-    3. Text Encoder inter-layer hybrid feature alignment (MSE + Cosine)
-    4. Independent control of weights and loss types for both feature alignments
-    5. Support for multiple teacher selection strategies
-    6. Detailed TensorBoard logging, including loss analysis for each teacher
-    7. Layer-adaptive loss strategy
-    """
+    """Multi-teacher text inversion training with hybrid UNet and text encoder feature alignment."""
 
     # Validate input parameters
     assert len(teacher_unets) == len(teacher_text_encoders) == len(dataloaders), \
@@ -680,7 +629,7 @@ def train_inversion_with_multi_feature_alignment(
     if not os.path.exists(tb_log_path):
         os.makedirs(tb_log_path, exist_ok=True)
     writer = SummaryWriter(log_dir=tb_log_path)
-    print(f"🔥 TensorBoard logs (multi-teacher hybrid feature alignment text inversion) will be saved to: {tb_log_path}")
+    print(f"TensorBoard logs: {tb_log_path}")
 
     # --- 🔥 UNet hybrid feature alignment component setup ---
     unet_alignment_layers_for_loss = unet_feature_alignment_layers
@@ -709,11 +658,7 @@ def train_inversion_with_multi_feature_alignment(
         channel_alignment="projection"
     )
     
-    print(f"🔥 UNet hybrid feature alignment loss configuration:")
-    print(f"   - Loss type: {unet_feature_loss_type}")
-    if unet_feature_loss_type == "hybrid":
-        print(f"   - Primary loss: {unet_primary_loss_type} ({100*(1-unet_loss_combination_weight):.1f}%)")
-        print(f"   - Secondary loss: {unet_secondary_loss_type} ({100*unet_loss_combination_weight:.1f}%)")
+    print(f"UNet feature alignment: type={unet_feature_loss_type}, layers={len(unet_alignment_layers_for_loss)}")
 
     # Create UNet feature extractor for each teacher
     teacher_unet_extractors = []
