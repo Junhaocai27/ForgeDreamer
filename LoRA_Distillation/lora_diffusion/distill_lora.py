@@ -341,7 +341,7 @@ def loss_step_gaussian_noise(
     vae,
     global_step,
     save_image_every_n_steps=101,
-    output_dir_for_loss_step="/root/lora_train/pic_train",
+    output_dir_for_loss_step="lora_train/pic_train",
     t_mutliplier=1.0,
     mixed_precision=False,
     mask_temperature=1.0,
@@ -2590,7 +2590,7 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
             transform_size=512,
             h_flip=True,
             aux_tokenizer1=student_tokenizer,
-            save_generated_images_path="/root/lora_train/pic_token_based",
+            save_generated_images_path="lora_train/pic_token_based",
             save_image_prefix=f"token_{token_idx+1:02d}_{token.replace('<', '').replace('>', '')}"
         )
         
@@ -2609,7 +2609,7 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
         print(f"  ✅ Token {token_idx+1} dataloader created successfully")
         print(f"    • Dataset size: {IMAGES_PER_TOKEN}")
         print(f"    • Target Token: {token}")
-        print(f"    • Save path: /root/lora_train/pic_token_based")
+        print(f"    • Save path: lora_train/pic_token_based")
         
         # Test whether the dataset correctly generates content for the target token
         print(f"  🧪 Validating dataset Token mapping:")
@@ -2644,7 +2644,7 @@ def create_token_based_teachers_and_dataloaders(teacher_lora_paths: List[str], t
     
     print(f"\n🔍 Data generation verification:")
     print(f"  • {IMAGES_PER_TOKEN} images generated per token")
-    print(f"  • Images saved to: /root/lora_train/pic_token_based")
+    print(f"  • Images saved to: lora_train/pic_token_based")
     print(f"  • Template type used: {use_template}")
     
     return token_based_teachers, token_dataloaders, new_token_teacher_mapping
@@ -2752,7 +2752,7 @@ def create_multiple_dataloaders_enhanced(teacher_models: List[dict], teacher_inf
                 transform_size=512,
                 h_flip=True,
                 aux_tokenizer1=student_tokenizer,
-                save_generated_images_path="/root/lora_train/pic_lora_based",
+                save_generated_images_path="lora_train/pic_lora_based",
                 save_image_prefix=f"teacher_{i+1}_{info['name']}"
             )
             

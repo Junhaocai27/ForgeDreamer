@@ -13,8 +13,8 @@ ModelParams:
 GuidanceParams:
   model_key: 'stabilityai/stable-diffusion-2-1-base'
   text: 'A highly detailed, industrial-grade metallic <screw> with realistic threading, sharp ridges, and a polished steel surface. Studio lighting, isolated on a plain background.'
-  LoRA_path: "/root/lora_train/multi_combine_20250703_172203/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"
-  # LoRA_path: "/root/lora_train/multi_combine_20250703_172203/multi_teacher_distilled/final_step_inv_multi_teacher_hybrid_5000.safetensors"
+  LoRA_path: "lora_train/multi_combine/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"
+  # LoRA_path: "lora_train/multi_combine/multi_teacher_distilled/final_step_inv_multi_teacher_hybrid_5000.safetensors"
   negative: 'unrealistic, blurry, low quality, out of focus, rusty, damaged, misaligned shape, sharp tip, oversaturation.'
   inverse_text: ''
   perpneg: true
@@ -33,7 +33,7 @@ GuidanceParams:
   use_dhg_latent_hypergraph: true
 
   # log路径
-  tensorboard_log_dir: "/root/LucidDreamer/runs/sd_training_cvprre"
+  tensorboard_log_dir: "runs/sd_training_cvprre"
   
   # 边缘引导损失参数
   edge_loss_weight: 1                 # 边缘引导损失权重
