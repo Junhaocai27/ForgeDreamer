@@ -241,7 +241,24 @@ Repeat this step for **every** concept and viewpoint. For example, you might tra
 
 ### Step 2 — Distil multiple LoRA weights into one
 
-Once all per-concept LoRAs are trained, move all the resulting `.safetensors` / `.pt` files into a single folder and run the distillation script.
+Once all per-concept LoRAs are trained, **rename** each `final_lora.safetensors` file to match its concept name and copy it into a single `distill_lora_weight/` folder before running the distillation script. The distillation script infers placeholder tokens directly from filenames (e.g. `screw_front.safetensors` → token `<screw_front>`), so renaming is required.
+
+For example, after training the `screw_front` and `screw_up` LoRAs:
+
+```bash
+mkdir -p distill_lora_weight
+
+cp lora_weight_before_distill/screw_front/final_lora.safetensors distill_lora_weight/screw_front.safetensors
+cp lora_weight_before_distill/screw_up/final_lora.safetensors   distill_lora_weight/screw_up.safetensors
+```
+
+After this step the folder should look like:
+
+```
+distill_lora_weight/
+├── screw_front.safetensors
+└── screw_up.safetensors
+```
 
 **Script:** `LoRA_Distillation/training_scripts/distill_lora.sh`
 
@@ -249,11 +266,11 @@ Edit the variables at the top of the script before running:
 
 | Variable | Description |
 |---|---|
-| `LORA_MODELS_DIR` | Directory containing all the individual LoRA weight files to distil |
+| `LORA_MODELS_DIR` | Directory containing all the renamed LoRA weight files to distil (e.g. `distill_lora_weight`) |
 | `BASE_MODEL` | Path or HuggingFace ID of the base SD model |
 | `OUTPUT_DIR` | Where to save the distilled LoRA (auto-timestamped directory) |
 
-The script automatically infers placeholder tokens from filenames (e.g. `screw.safetensors` → token `<screw>`).
+The script automatically infers placeholder tokens from filenames (e.g. `screw_front.safetensors` → token `<screw_front>`).
 
 ```bash
 bash LoRA_Distillation/training_scripts/distill_lora.sh
