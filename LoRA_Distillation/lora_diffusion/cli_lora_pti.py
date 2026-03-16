@@ -994,7 +994,7 @@ def train(
         ]
         inspect_lora(text_encoder)
         
-    print(f'训练参数:{params_to_optimize}')
+    print(f'Training parameters: {params_to_optimize}')
 
     lora_optimizers = optim.AdamW(params_to_optimize, weight_decay=weight_decay_lora)
 
