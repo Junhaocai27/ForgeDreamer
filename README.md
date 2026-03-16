@@ -292,10 +292,22 @@ tensorboard --logdir ./output/<workspace>
 If you find ForgeDreamer useful for your research, please cite our paper:
 
 ```bibtex
-@inproceedings{cai2026forgedreamer,
-  title     = {ForgeDreamer: Industrial Text-to-3D Generation with Multi-Expert LoRA and Cross-View Hypergraph},
-  author    = {Cai, Junhao and Zeng, Deyu and Pang, Junhao and Li, Lini and Wu, Zongze and Zhong, Xiaopin},
-  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-  year      = {2026}
+@article{cai2026forgedreamer,
+  title={ForgeDreamer: Industrial Text-to-3D Generation with Multi-Expert LoRA and Cross-View Hypergraph},
+  author={Cai, Junhao and Zeng, Deyu and Pang, Junhao and Li, Lini and Wu, Zongze and Zhong, Xiaopin},
+  journal={arXiv preprint arXiv:2603.09266},
+  year={2026}
 }
 ```
+## 🙏 Acknowledgement
+
+This work is built on many amazing research works and open-source projects:
+
+* [gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting) and [diff-gaussian-rasterization](https://github.com/graphdeco-inria/diff-gaussian-rasterization)
+* [Stable-Dreamfusion](https://github.com/ashawkey/stable-dreamfusion)
+* [Point-E](https://github.com/openai/point-e)
+* [lora](https://github.com/cloneofsimo/lora)
+* [LucidDreamer](https://github.com/EnVision-Research/LucidDreamer)
+
+Thanks for their excellent work and great contribution to 3D generation area.
+
