@@ -13,8 +13,9 @@ ModelParams:
 GuidanceParams:
   model_key: 'stabilityai/stable-diffusion-2-1-base'
   text: 'A highly detailed, industrial-grade metallic <screw> with realistic threading, sharp ridges, and a polished steel surface. Studio lighting, isolated on a plain background.'
-  LoRA_path: "lora_train/multi_combine/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"
-  # LoRA_path: "lora_train/multi_combine/multi_teacher_distilled/final_step_inv_multi_teacher_hybrid_5000.safetensors"
+  # Replace <YYYYMMDD_HHMMSS> with the actual timestamp from your distill_lora.sh run
+  LoRA_path: "lora_train/multi_combine_<YYYYMMDD_HHMMSS>/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"
+  # LoRA_path: "lora_train/multi_combine_<YYYYMMDD_HHMMSS>/multi_teacher_distilled/final_step_inv_multi_teacher_hybrid_5000.safetensors"
   negative: 'unrealistic, blurry, low quality, out of focus, rusty, damaged, misaligned shape, sharp tip, oversaturation.'
   inverse_text: ''
   perpneg: true
