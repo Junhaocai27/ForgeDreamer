@@ -24,7 +24,6 @@ dist/
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
-*.ipynb
 
 # Training / experiment logs
 runs/
@@ -45,10 +44,6 @@ results/
 # Cache directories
 point_e_model_cache/
 .cache/
-
-# Dataset files
-data/
-datasets/
 
 # Temporary files
 *.tmp
