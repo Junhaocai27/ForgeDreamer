@@ -8,6 +8,7 @@ import random
 import re
 from pathlib import Path
 from typing import Optional, List, Literal
+import datetime
 
 import warnings
 warnings.filterwarnings("ignore")  # Disable all warnings
@@ -39,7 +40,6 @@ from feature_hook_unet import FeatureAlignmentLoss, UNetFeatureExtractor, create
 from feature_hook_text_encoder import TextEncoderFeatureExtractor, TextEncoderFeatureAlignmentLoss, create_hybrid_text_encoder_alignment_loss
 from dynamic_weight import create_inversion_weight_adjuster, create_tuning_weight_adjuster
 
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../..'))
 from lora_diffusion import (
     PivotalTuningDatasetCapation,
     PivotalTuningDatasetCapationPromptOnly,
@@ -622,7 +622,6 @@ def train_inversion_with_multi_feature_alignment(
     use_mixed_precision = (mixed_precision != "no")
 
     # --- TensorBoard setup ---
-    import datetime
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     tb_log_path = os.path.join(tensorboard_log_dir, f"{out_name}_inversion_multi_teacher_hybrid_feat_align_{timestamp}")
 
