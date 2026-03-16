@@ -151,14 +151,19 @@ The dataset contains multi-view images of industrial components (bearings, gaske
    ```
    data/
    ├── screw/
-   │   ├── image_001.png
-   │   ├── image_002.png
-   │   └── ...
+   │   ├── front/
+   │   │   ├── 1.png
+   │   │   ├── 2.png
+   │   │   └── ...
+   │   └── up/
+   │       ├── 1.png
+   │       ├── 2.png
+   │       └── ...
    ├── nut/
    │   └── ...
    └── ...
    ```
-3. Set the `INSTANCE_DIR` variable in `LoRA_Distillation/training_scripts/train_lora.sh` to the path of the relevant category folder (e.g. `data/screw`) when training individual LoRA weights (see **Step 1** below).
+3. Set the `INSTANCE_DIR` variable in `LoRA_Distillation/training_scripts/train_lora.sh` to the path of the relevant view sub-folder (e.g. `data/screw/front` or `data/screw/up`) when training individual LoRA weights (see **Step 1** below).
 
 ### Pretrained Model
 
@@ -178,6 +183,12 @@ ForgeDreamer/
 ├── train.sh                                  # Shell script to launch train.py
 ├── configs/
 │   └── screw.yaml                            # Example YAML configuration
+├── data/
+│   └── screw/                                # Example category folder (one folder per category)
+│       ├── front/                            # Front-view training images (1.png, 2.png, …)
+│       └── up/                               # Top-down training images (1.png, 2.png, …)
+├── lora_before_distill/                      # Individual LoRA weights saved after Step 1
+│   └── screw_front/                          # Output directory for each per-view LoRA
 ├── guidance/
 │   ├── sd_utils.py                           # SD guidance utilities (ISM/SDS, DHG hypergraph)
 │   ├── hypergraph_enhancer.py                # DHG latent hypergraph gradient enhancer
@@ -218,13 +229,13 @@ Edit the variables at the top of the script before running:
 | `MODEL_NAME` | Path or HuggingFace ID of the base SD model (e.g. `stabilityai/stable-diffusion-2-1-base`) |
 | `INSTANCE_DIR` | Directory containing training images for this concept |
 | `OUTPUT_DIR` | Where to save the resulting LoRA weights |
-| `--placeholder_tokens` | The trigger token for this concept (e.g. `<screw>`) |
+| `--placeholder_tokens` | The trigger token for this concept (e.g. `<screw_front>` for the front-view LoRA, `<screw_up>` for the top-down LoRA) |
 
 ```bash
 bash LoRA_Distillation/training_scripts/train_lora.sh
 ```
 
-Repeat this step for **every** concept. For example, you might train one LoRA for the front-view appearance (`<screw>`) and another for the top-down appearance (`<screw_up>`), saving each to a separate output directory.
+Repeat this step for **every** concept and viewpoint. For example, you might train one LoRA for the front-view appearance (`<screw_front>`) and another for the top-down appearance (`<screw_up>`), saving each to a separate output directory.
 
 ---
 
