@@ -1,6 +1,55 @@
+# Python bytecode
 *.pyc
-.vscode
-output
-build
+*.pyo
+__pycache__/
+
+# Build artifacts
+build/
+dist/
+*.so
+*.o
+*.a
+*.egg-info/
+
+# Model weights and large binary files
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.pkl
+
+# Windows DLLs
+*.dll
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb
+
+# Training / experiment logs
+runs/
+runs_new/
+wandb/
+logs/
+events.out.tfevents.*
+
+# Editor settings
+.vscode/
+.idea/
+
+# Output directories
 output/
+output_*/
+results/
+
+# Cache directories
 point_e_model_cache/
+.cache/
+
+# Dataset files
+data/
+datasets/
+
+# Temporary files
+*.tmp
+*.temp
