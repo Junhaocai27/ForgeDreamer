@@ -280,6 +280,7 @@ The distilled LoRA is saved to:
 ```
 $OUTPUT_DIR/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_<N>.safetensors
 ```
+where `<N>` is the total number of LoRA tuning steps, controlled by the `--max_train_steps_tuning` argument (default: `5000`). With the default settings the filename will be `final_multi_teacher_hybrid_lora_step_5000.safetensors`.
 
 ---
 
@@ -291,7 +292,7 @@ Edit `configs/screw.yaml` (or create your own config based on it) and update the
 GuidanceParams:
   model_key: 'stabilityai/stable-diffusion-2-1-base'      # Base SD model key or local path
   text: 'A highly detailed ... <screw> ...'               # Prompt including your trigger token(s)
-  LoRA_path: "lora_train/multi_combine_<YYYYMMDD_HHMMSS>/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"  # replace <YYYYMMDD_HHMMSS> with the timestamp from your distill_lora.sh run
+  LoRA_path: "lora_train/multi_combine_<YYYYMMDD_HHMMSS>/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"  # replace <YYYYMMDD_HHMMSS> with the timestamp from your distill_lora.sh run; 5000 = --max_train_steps_tuning
   negative: 'unrealistic, blurry, low quality, ...'       # Negative prompt
   inverse_text: ''                                         # Text for DDIM inversion (ISM mode)
 
