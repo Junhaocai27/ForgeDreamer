@@ -268,7 +268,7 @@ Edit the variables at the top of the script before running:
 |---|---|
 | `LORA_MODELS_DIR` | Directory containing all the renamed LoRA weight files to distil (e.g. `distill_lora_weight`) |
 | `BASE_MODEL` | Path or HuggingFace ID of the base SD model |
-| `OUTPUT_DIR` | Where to save the distilled LoRA (auto-timestamped directory) |
+| `OUTPUT_DIR` | Where to save the distilled LoRA |
 
 The script automatically infers placeholder tokens from filenames (e.g. `screw_front.safetensors` → token `<screw_front>`).
 
@@ -291,7 +291,7 @@ Edit `configs/screw.yaml` (or create your own config based on it) and update the
 GuidanceParams:
   model_key: 'stabilityai/stable-diffusion-2-1-base'      # Base SD model key or local path
   text: 'A highly detailed ... <screw> ...'               # Prompt including your trigger token(s)
-  LoRA_path: "/path/to/final_multi_teacher_hybrid_lora_step_5000.safetensors"
+  LoRA_path: "lora_train/multi_combine/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"
   negative: 'unrealistic, blurry, low quality, ...'       # Negative prompt
   inverse_text: ''                                         # Text for DDIM inversion (ISM mode)
 
