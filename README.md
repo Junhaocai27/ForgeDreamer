@@ -79,23 +79,54 @@ These components work synergistically improved semantic understanding, enables m
 
 We recommend using Anaconda to manage the environment. Please follow the steps below to set up the environment:
 
+### Step 0 — Install CUDA Toolkit 12.1
+
+Before setting up the Python environment, make sure **CUDA Toolkit 12.1** is installed on your server.
+
+**Linux (Ubuntu 22.04 x86_64):**
+
 ```bash
-# 1. Clone the repository with submodules
+wget https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda_12.1.0_530.30.02_linux.run
+sudo sh cuda_12.1.0_530.30.02_linux.run
+```
+
+> For other operating systems and architectures, download the appropriate installer from the official CUDA 12.1 archive:
+> 👉 **[https://developer.nvidia.com/cuda-12-1-0-download-archive](https://developer.nvidia.com/cuda-12-1-0-download-archive)**
+
+---
+
+### Step 1 — Clone the repository
+
+```bash
 git clone https://github.com/Junhaocai27/ForgeDreamer.git --recursive
 cd ./ForgeDreamer
+```
 
-# 2. Create and activate the Conda environment
+### Step 2 — Create and activate the Conda environment
+
+```bash
 conda create -n "ForgeDreamer" python=3.10 -y
 conda activate ForgeDreamer
+```
 
-# 3. Set CUDA architecture list (adjust according to your GPU if necessary)
+### Step 3 — Set CUDA architecture list
+
+Adjust the architecture flags according to your GPU if necessary:
+
+```bash
 export TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+```
 
-# 4. Install Python dependencies
+### Step 4 — Install Python dependencies
+
+```bash
 pip install -r requirements.txt
 pip install dhg==0.9.5 --no-deps
+```
 
-# 5. Install custom submodules and local packages
+### Step 5 — Install custom submodules and local packages
+
+```bash
 pip install submodules/diff-gaussian-rasterization --no-build-isolation
 pip install submodules/simple-knn/ --no-build-isolation
 pip install ./LoRA_Distillation --no-build-isolation
