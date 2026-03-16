@@ -103,7 +103,9 @@ pip install ./LoRA_Distillation --no-build-isolation
 
 ---
 
-## 📦 Dataset
+## 📦 Dataset and Pretrained Model
+
+### Dataset
 
 The custom industrial dataset used to train and evaluate ForgeDreamer is available on Google Drive:
 
@@ -126,6 +128,14 @@ The dataset contains multi-view images of industrial components (bearings, gaske
    └── ...
    ```
 3. Set the `INSTANCE_DIR` variable in `LoRA_Distillation/training_scripts/train_lora.sh` to the path of the relevant category folder (e.g. `data/screw`) when training individual LoRA weights (see **Step 1** below).
+
+### Pretrained Model
+
+ForgeDreamer uses **Stable Diffusion v2.1-base** as the base generative model. You can download it from HuggingFace:
+
+👉 **[Download Stable Diffusion v2.1-base](https://huggingface.co/sd-research/stable-diffusion-2-1-base)**
+
+After downloading, set the `MODEL_NAME` variable in `LoRA_Distillation/training_scripts/train_lora.sh` and the `model_key` field in your YAML config to the local path or HuggingFace ID of the downloaded model.
 
 ---
 
