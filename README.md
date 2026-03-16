@@ -103,6 +103,32 @@ pip install ./LoRA_Distillation --no-build-isolation
 
 ---
 
+## 📦 Dataset
+
+The custom industrial dataset used to train and evaluate ForgeDreamer is available on Google Drive:
+
+👉 **[Download Dataset](https://drive.google.com/drive/folders/1xvphtOr9_fKJWhtEggp2OJx2HPNd1Jnf?usp=sharing)**
+
+The dataset contains multi-view images of industrial components (bearings, gaskets, LEDs, resistors, nails, nuts, screws, etc.) that are used as training images for the per-concept LoRA fine-tuning step.
+
+**Instructions:**
+
+1. Open the link above and download the dataset folder (or individual category sub-folders).
+2. Place the downloaded images under a local directory, for example:
+   ```
+   data/
+   ├── screw/
+   │   ├── image_001.png
+   │   ├── image_002.png
+   │   └── ...
+   ├── nut/
+   │   └── ...
+   └── ...
+   ```
+3. Set the `INSTANCE_DIR` variable in `LoRA_Distillation/training_scripts/train_lora.sh` to the path of the relevant category folder (e.g. `data/screw`) when training individual LoRA weights (see **Step 1** below).
+
+---
+
 ## 🗂️ Repository Structure
 
 ```
