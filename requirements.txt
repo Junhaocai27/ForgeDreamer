@@ -1,11 +1,11 @@
-# === 1. 指定 PyTorch 官方 CUDA 12.1 镜像源 ===
+# === 1. Specify PyTorch official CUDA 12.1 index URL ===
 --extra-index-url https://download.pytorch.org/whl/cu121
 
-# === 2. 核心深度学习框架 ===
+# === 2. Core deep learning frameworks ===
 torch==2.3.1+cu121
 torchvision==0.18.1+cu121
 
-# === 3. 视觉与扩散模型核心库 ===
+# === 3. Core libraries for vision and diffusion models ===
 diffusers==0.33.1
 transformers==4.49.0
 huggingface_hub==0.31.4
@@ -13,18 +13,18 @@ accelerate==1.7.0
 safetensors==0.5.3
 xformers==0.0.27
 
-# === 4. 图像、视频与科学计算 ===
+# === 4. Image, video, and scientific computing ===
 Pillow==11.2.1
 opencv-python==4.11.0.86
-opencv-contrib-python==4.11.0.86  # 锁定此项以解决 mediapipe 的回溯问题
+opencv-contrib-python==4.11.0.86  # pinned to resolve mediapipe backtracking issue
 imageio==2.31.1
 imageio-ffmpeg==0.6.0
 scipy==1.13.1
-scikit-image==0.22.0              # 锁定此项以解决 point-e 的回溯问题
-numpy==1.26.4                     # 锁定确切版本，加速依赖解析
-pandas==2.3.3                     # 锁定确切版本
+scikit-image==0.22.0              # pinned to resolve point-e backtracking issue
+numpy==1.26.4                     # pinned exact version to speed up dependency resolution
+pandas==2.3.3                     # pinned exact version
 
-# === 5. 实用工具与杂项 ===
+# === 5. Utilities and miscellaneous ===
 pip==26.0.1
 tqdm==4.67.1
 mediapipe==0.10.21
@@ -32,8 +32,8 @@ fire==0.5.0
 PyYAML==6.0.2
 wandb==0.20.1
 triton==2.3.1
-gradio==5.38.2                    # 锁定兼容的最终版本，防止几十次的降级尝试
-gradio-client==1.11.0             # 显式锁定对应的 client 版本
+gradio==5.38.2                    # pinned compatible final version to avoid numerous downgrade attempts
+gradio-client==1.11.0             # explicitly pinned corresponding client version
 plyfile==0.8.1
 ftfy==6.3.1
 tensorboard==2.19.0 
