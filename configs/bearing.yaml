@@ -31,7 +31,7 @@ GuidanceParams:
 
   use_dhg_latent_hypergraph: true
 
-  tensorboard_log_dir: "/root/LucidDreamer/runs/sd_training_new8"
+  tensorboard_log_dir: "runs/sd_training_new8"
   
   edge_loss_weight: 1
   edge_warmup_iters: 500
