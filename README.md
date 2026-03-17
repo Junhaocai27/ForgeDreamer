@@ -173,6 +173,15 @@ ForgeDreamer uses **Stable Diffusion v2.1-base** as the base generative model. Y
 
 After downloading, set the `MODEL_NAME` variable in `LoRA_Distillation/training_scripts/train_lora.sh` and the `model_key` field in your YAML config to the local path or HuggingFace ID of the downloaded model.
 
+### Distilled LoRA Weights (Ready to Use)
+
+We also provide already distilled LoRA weights on Google Drive:
+
+👉 **[Download Distilled Weights](https://drive.google.com/drive/folders/1TGsymqKlatDS65TuYX3URsGXle43sQKm?usp=sharing)**
+
+If you use these ready-made distilled weights, you can skip **Step 1** and **Step 2** in the workflow below.  
+After downloading, place the `.safetensors` file under your local `lora_train/` directory and set `GuidanceParams.LoRA_path` in your YAML config to the exact file path (see **Step 3**).
+
 ---
 
 ## 🗂️ Repository Structure
@@ -187,8 +196,11 @@ ForgeDreamer/
 │   └── screw/                                # Example category folder (one folder per category)
 │       ├── front/                            # Front-view training images (1.png, 2.png, …)
 │       └── up/                               # Top-down training images (1.png, 2.png, …)
-├── lora_before_distill/                      # Individual LoRA weights saved after Step 1
+├── lora_weight_before_distill/               # Individual LoRA weights saved after Step 1
 │   └── screw_front/                          # Output directory for each per-view LoRA
+├── distill_lora_weight/                      # Renamed per-concept LoRA files used as Step 2 input
+│   ├── screw_front.safetensors
+│   └── screw_up.safetensors
 ├── guidance/
 │   ├── sd_utils.py                           # SD guidance utilities (ISM/SDS, DHG hypergraph)
 │   ├── hypergraph_enhancer.py                # DHG latent hypergraph gradient enhancer
@@ -241,7 +253,7 @@ Repeat this step for **every** concept and viewpoint. For example, you might tra
 
 ### Step 2 — Distil multiple LoRA weights into one
 
-Once all per-concept LoRAs are trained, **rename** each `final_lora.safetensors` file to match its concept name and copy it into a single `distill_lora_weight/` folder before running the distillation script. The distillation script infers placeholder tokens directly from filenames (e.g. `screw_front.safetensors` → token `<screw_front>`), so renaming is required.
+Once all per-concept LoRAs are trained (for example under `lora_weight_before_distill/screw_front/` and `lora_weight_before_distill/screw_up/`), **rename** each `final_lora.safetensors` file to match its concept name and copy it into a single `distill_lora_weight/` folder before running the distillation script. The distillation script infers placeholder tokens directly from filenames (e.g. `screw_front.safetensors` → token `<screw_front>`), so renaming is required.
 
 For example, after training the `screw_front` and `screw_up` LoRAs:
 
@@ -269,6 +281,8 @@ Edit the variables at the top of the script before running:
 | `LORA_MODELS_DIR` | Directory containing all the renamed LoRA weight files to distil (e.g. `distill_lora_weight`) |
 | `BASE_MODEL` | Path or HuggingFace ID of the base SD model |
 | `OUTPUT_DIR` | Where to save the distilled LoRA (auto-timestamped, e.g. `lora_train/multi_combine_20240101_120000`) |
+
+Set `LORA_MODELS_DIR` in `LoRA_Distillation/training_scripts/distill_lora.sh` to the same folder you prepared above (for example `distill_lora_weight`).
 
 The script automatically infers placeholder tokens from filenames (e.g. `screw_front.safetensors` → token `<screw_front>`).
 
@@ -406,4 +420,3 @@ This work is built on many amazing research works and open-source projects:
 * [LucidDreamer](https://github.com/EnVision-Research/LucidDreamer)
 
 Thanks for their excellent work and great contribution to 3D generation area.
-
