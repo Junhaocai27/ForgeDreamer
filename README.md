@@ -11,7 +11,7 @@
 
 <sup>*</sup> Equal contribution. &nbsp;&nbsp;&nbsp;&nbsp; <sup>†</sup> Corresponding author.
 
-[Paper PDF (Arxiv)](https://arxiv.org/abs/2603.09266) | [Project Page (Coming Soon)](#) 
+[Paper PDF (Arxiv)](https://arxiv.org/abs/2603.09266) | [Project Page](https://forgedreamer.github.io/) 
 
 </div>
 
