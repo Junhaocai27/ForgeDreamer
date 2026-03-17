@@ -294,7 +294,7 @@ Once all per-concept LoRAs are trained (for example under `lora_weight_before_di
 
 Filename-to-token rule of thumb:
 - `xxx.safetensors` → token `<xxx>`
-- Avoid spaces and special symbols in `xxx`
+- Use only lowercase letters, numbers, and underscores in `xxx` (e.g. `screw_front`)
 - Keep token naming consistent with how you plan to write prompts in Step 3
 
 For example, after training the `screw_front` and `screw_up` LoRAs:
