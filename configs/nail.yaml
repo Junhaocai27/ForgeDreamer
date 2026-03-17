@@ -1,9 +1,9 @@
 port: 2355
 save_video: true
-seed: 42 # 种子42
+seed: 42
 
 PipelineParams:
-  convert_SHs_python: True # true = using direct rgb
+  convert_SHs_python: True
 
 ModelParams:
   workspace: nail_new_ex_test2
@@ -13,12 +13,12 @@ ModelParams:
 GuidanceParams:
   model_key: 'stabilityai/stable-diffusion-2-1-base'
   text: 'A professional close-up photograph of a precision-manufactured <nail> with smooth cylindrical shank, flat circular head, and sharp tapered point. Polished steel construction with slight metallic sheen, high-quality hardware fastener. Studio lighting highlighting the metallic texture and form against neutral background.'
-  LoRA_path: "/root/lora_train/multi_combine_20250717_175353/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"
-  # LoRA_path: "/root/lora_train/multi_combine_20250703_172203/multi_teacher_distilled/final_step_inv_multi_teacher_hybrid_5000.safetensors"
+  # Update this path to one of your available distilled LoRA weights.
+  LoRA_path: "lora_train/multi_combine_<YYYYMMDD_HHMMSS>/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"
   negative: 'unrealistic, blurry, low quality, out of focus, rusty, damaged, misaligned shape, sharp tip, oversaturation.'
   inverse_text: ''
   perpneg: true
-  C_batch_size: 4  # 修改为6
+  C_batch_size: 4
   t_range: [0.02, 0.5]
   max_t_range: 0.98
   lambda_guidance: 0.15
@@ -29,19 +29,16 @@ GuidanceParams:
   sd_matching_iter: 1500
   sd_loss_weight2: 1
 
-  # 超图使用
   use_dhg_latent_hypergraph: true
 
-  # log路径
-  tensorboard_log_dir: "/root/LucidDreamer/runs/sd_training_new7"
+  tensorboard_log_dir: "runs/sd_training_new7"
   
-  # 边缘引导损失参数
-  edge_loss_weight: 1                 # 边缘引导损失权重
-  edge_warmup_iters: 500                # 边缘引导损失预热迭代次数
+  edge_loss_weight: 1
+  edge_warmup_iters: 500
 
   ddim_inv: true
   annealing_intervals: true
-  fixed_view: true  # 固定视角
+  fixed_view: true
 
   xs_delta_t: 200
   xs_inv_steps: 5
@@ -56,12 +53,10 @@ GenerateCamParams:
   use_pointe_rgb: false
   init_num_pts: 100_000
   
-  # 🔥 水平角度：全方位旋转以观察螺纹
   phi_range: [-180, 180]
   max_phi_range: [-180, 180]
-  rand_cam_gamma: 1.2  # 减小，使视角分布更均匀
+  rand_cam_gamma: 1.2
   
-  # 🔥 关键：垂直角度偏向正视和俯视
   theta_range: [45, 105]
   max_theta_range: [45, 105]
 
@@ -78,21 +73,19 @@ OptimizationParams:
   save_process: True
   pro_frames_num: 600
   pro_render_45: False
-  warmup_iter: 1500 # 2500
+  warmup_iter: 1500
 
   as_latent_ratio: 0.25
   geo_iter: 0
-  densify_from_iter: 100  # 提前加快密度优化
+  densify_from_iter: 100
   densify_until_iter: 3000
   percent_dense: 0.005
   densify_grad_threshold: 0.00075
   progressive_view_iter: 500
-  opacity_reset_interval: 300  # 适当增加，优化透明度
+  opacity_reset_interval: 300
 
   scale_up_cameras_iter: 500
   fovy_scale_up_factor: [0.75, 1.1]
   phi_scale_up_factor: 1.5
   
-  # viewpoint_mode: 'six_view'
-  save_sd_images: False  # 启用SD参考图像保存
-  # use_control_net_iter: 10
+  save_sd_images: False

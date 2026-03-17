@@ -1,9 +1,9 @@
 port: 2355
 save_video: true
-seed: 42 # seed 42
+seed: 42
 
 PipelineParams:
-  convert_SHs_python: True # true = using direct rgb
+  convert_SHs_python: True
 
 ModelParams:
   workspace: screw_cvpr_re_4_check
@@ -13,13 +13,12 @@ ModelParams:
 GuidanceParams:
   model_key: 'stabilityai/stable-diffusion-2-1-base'
   text: 'A highly detailed, industrial-grade metallic <screw> with realistic threading, sharp ridges, and a polished steel surface. Studio lighting, isolated on a plain background.'
-  # Replace <YYYYMMDD_HHMMSS> with the actual timestamp from your distill_lora.sh run
+  # Update this path to one of your available distilled LoRA weights.
   LoRA_path: "lora_train/multi_combine_<YYYYMMDD_HHMMSS>/multi_teacher_distilled/final_multi_teacher_hybrid_lora_step_5000.safetensors"
-  # LoRA_path: "lora_train/multi_combine_<YYYYMMDD_HHMMSS>/multi_teacher_distilled/final_step_inv_multi_teacher_hybrid_5000.safetensors"
   negative: 'unrealistic, blurry, low quality, out of focus, rusty, damaged, misaligned shape, sharp tip, oversaturation.'
   inverse_text: ''
   perpneg: true
-  C_batch_size: 4  # changed to 6
+  C_batch_size: 4
   t_range: [0.02, 0.5]
   max_t_range: 0.98
   lambda_guidance: 0.15
@@ -30,19 +29,16 @@ GuidanceParams:
   sd_matching_iter: 1500
   sd_loss_weight2: 1
 
-  # hypergraph usage
   use_dhg_latent_hypergraph: true
 
-  # log path
   tensorboard_log_dir: "runs/sd_training_cvprre"
   
-  # edge-guided loss parameters
-  edge_loss_weight: 1                 # edge-guided loss weight
-  edge_warmup_iters: 500                # warmup iterations for edge-guided loss
+  edge_loss_weight: 1
+  edge_warmup_iters: 500
 
   ddim_inv: true
   annealing_intervals: true
-  fixed_view: true  # fixed viewpoint
+  fixed_view: true
 
   xs_delta_t: 200
   xs_inv_steps: 5
@@ -57,12 +53,10 @@ GenerateCamParams:
   use_pointe_rgb: false
   init_num_pts: 100_000
   
-  # 🔥 Horizontal angle: full rotation to observe threading
   phi_range: [-180, 180]
   max_phi_range: [-180, 180]
-  rand_cam_gamma: 1.2  # decreased to make viewpoint distribution more uniform
+  rand_cam_gamma: 1.2
   
-  # 🔥 Key: vertical angle biased toward front-view and top-view
   theta_range: [45, 105]
   max_theta_range: [45, 105]
 
@@ -79,21 +73,19 @@ OptimizationParams:
   save_process: True
   pro_frames_num: 600
   pro_render_45: False
-  warmup_iter: 1500 # 2500
+  warmup_iter: 1500
 
   as_latent_ratio: 0.25
   geo_iter: 0
-  densify_from_iter: 100  # start early to accelerate density optimization
+  densify_from_iter: 100
   densify_until_iter: 3000
   percent_dense: 0.005
   densify_grad_threshold: 0.00075
   progressive_view_iter: 500
-  opacity_reset_interval: 300  # moderately increased to optimize opacity
+  opacity_reset_interval: 300
 
   scale_up_cameras_iter: 500
   fovy_scale_up_factor: [0.75, 1.1]
   phi_scale_up_factor: 1.5
   
-  # viewpoint_mode: 'six_view'
-  save_sd_images: False  # enable SD reference image saving
-  # use_control_net_iter: 10
+  save_sd_images: False
