@@ -75,6 +75,20 @@ These components work synergistically improved semantic understanding, enables m
 
 </details>
 
+## ✅ Before You Start
+
+To avoid path/config mismatch issues later, confirm the following first:
+
+- You have an NVIDIA GPU environment that can run CUDA 12.1 + PyTorch CUDA builds.
+- You have enough disk space for:
+  - dataset images,
+  - intermediate LoRA checkpoints (`lora_weight_before_distill/`),
+  - distilled LoRA outputs (`lora_train/multi_combine_*/`),
+  - Text-to-3D outputs (`output/<workspace>/`).
+- You decide your workflow route in advance:
+  - **Route A (Fastest):** Use provided distilled LoRA weights → go directly to **Step 3** and **Step 4**.
+  - **Route B (Full training):** Train per-concept LoRAs + distillation → run **Step 1 → Step 4** end-to-end.
+
 ## 🔧 Installation
 
 We recommend using Anaconda to manage the environment. Please follow the steps below to set up the environment:
@@ -165,6 +179,8 @@ The dataset contains multi-view images of industrial components (bearings, gaske
    ```
 3. Set the `INSTANCE_DIR` variable in `LoRA_Distillation/training_scripts/train_lora.sh` to the path of the relevant view sub-folder (e.g. `data/screw/front` or `data/screw/up`) when training individual LoRA weights (see **Step 1** below).
 
+> Recommended naming convention for robust downstream processing: use lowercase letters, numbers, and underscores in concept/view names (e.g. `screw_front`, `green_led_up`) so that generated placeholder tokens remain clean and unambiguous.
+
 ### Pretrained Model
 
 ForgeDreamer uses **Stable Diffusion v2.1-base** as the base generative model. You can download it from HuggingFace:
@@ -181,6 +197,27 @@ We also provide already distilled LoRA weights on Google Drive:
 
 If you use these ready-made distilled weights, you can skip **Step 1** and **Step 2** in the workflow below.  
 After downloading, place the `.safetensors` file under your local `lora_train/` directory and set `GuidanceParams.LoRA_path` in your YAML config to the exact file path (see **Step 3**).
+
+---
+
+## 🧭 Workflow at a Glance
+
+```text
+Install environment
+    ↓
+Prepare dataset + base SD model
+    ↓
+Choose route:
+  A) Use provided distilled LoRA  ──→ Step 3 (YAML) ──→ Step 4 (train.py)
+  B) Train your own:
+       Step 1 (per-concept LoRA)
+         ↓
+       Step 2 (multi-LoRA distillation)
+         ↓
+       Step 3 (YAML)
+         ↓
+       Step 4 (train.py)
+```
 
 ---
 
@@ -255,6 +292,11 @@ Repeat this step for **every** concept and viewpoint. For example, you might tra
 
 Once all per-concept LoRAs are trained (for example under `lora_weight_before_distill/screw_front/` and `lora_weight_before_distill/screw_up/`), **rename** each `final_lora.safetensors` file to match its concept name and copy it into a single `distill_lora_weight/` folder before running the distillation script. The distillation script infers placeholder tokens directly from filenames (e.g. `screw_front.safetensors` → token `<screw_front>`), so renaming is required.
 
+Filename-to-token rule of thumb:
+- `xxx.safetensors` → token `<xxx>`
+- Avoid spaces and special symbols in `xxx`
+- Keep token naming consistent with how you plan to write prompts in Step 3
+
 For example, after training the `screw_front` and `screw_up` LoRAs:
 
 ```bash
@@ -314,6 +356,11 @@ ModelParams:
   workspace: my_output_name    # Output folder name under ./output/
 ```
 
+Important prompt/token consistency note:
+- If Step 2 generated tokens like `<screw_front>` and `<screw_up>`, your `GuidanceParams.text` should include the token(s) you actually want to activate.
+- For single-concept distilled LoRA, one trigger token is usually sufficient.
+- For multi-concept distilled LoRA, include the relevant token combination explicitly in the prompt text.
+
 Key optional parameters in `GuidanceParams`:
 
 | Parameter | Default | Description |
@@ -352,6 +399,18 @@ Monitor training progress with TensorBoard:
 ```bash
 tensorboard --logdir ./output/<workspace>
 ```
+
+---
+
+## ✅ End-to-End Consistency Checklist
+
+Before launching long training runs, quickly check:
+
+- `MODEL_NAME` / `BASE_MODEL` / `GuidanceParams.model_key` refer to the same SD base model family.
+- `GuidanceParams.LoRA_path` points to an existing `.safetensors` file.
+- Prompt trigger token(s) in `GuidanceParams.text` match Step 2 filename-derived token names.
+- `ModelParams.workspace` is unique enough to avoid overwriting old experiments.
+- Selected config file in `train.py --opt ...` is the one you actually edited.
 
 ---
 
