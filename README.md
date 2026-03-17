@@ -240,7 +240,7 @@ Edit the variables at the top of the script before running:
 |---|---|
 | `MODEL_NAME` | Path or HuggingFace ID of the base SD model (e.g. `stabilityai/stable-diffusion-2-1-base`) |
 | `INSTANCE_DIR` | Directory containing training images for this concept |
-| `OUTPUT_DIR` | Where to save the resulting LoRA weights |
+| `OUTPUT_DIR` | Where to save the resulting LoRA weights (e.g. `lora_weight_before_distill/screw_front`) |
 | `--placeholder_tokens` | The trigger token for this concept (e.g. `<screw_front>` for the front-view LoRA, `<screw_up>` for the top-down LoRA) |
 
 ```bash
