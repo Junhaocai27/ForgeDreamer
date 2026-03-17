@@ -80,6 +80,7 @@ These components work synergistically improved semantic understanding, enables m
 To avoid path/config mismatch issues later, confirm the following first:
 
 - You have an NVIDIA GPU environment that can run CUDA 12.1 + PyTorch CUDA builds.
+  - The setup commands in this README are validated against CUDA 12.1.
 - You have enough disk space for:
   - dataset images,
   - intermediate LoRA checkpoints (`lora_weight_before_distill/`),
@@ -179,7 +180,7 @@ The dataset contains multi-view images of industrial components (bearings, gaske
    ```
 3. Set the `INSTANCE_DIR` variable in `LoRA_Distillation/training_scripts/train_lora.sh` to the path of the relevant view sub-folder (e.g. `data/screw/front` or `data/screw/up`) when training individual LoRA weights (see **Step 1** below).
 
-> Recommended naming convention for robust downstream processing: use lowercase letters, numbers, and underscores in concept/view names (e.g. `screw_front`, `green_led_up`) so that generated placeholder tokens remain clean and unambiguous.
+> Recommended naming convention for robust downstream processing: use lowercase letters, numbers, and underscores in concept/view names (e.g. `screw_front`, `green_led_up`) so that generated placeholder tokens remain clean and unambiguous. Spaces or special symbols can cause token parsing/matching issues in downstream scripts.
 
 ### Pretrained Model
 
@@ -294,7 +295,7 @@ Once all per-concept LoRAs are trained (for example under `lora_weight_before_di
 
 Filename-to-token rule of thumb:
 - `xxx.safetensors` → token `<xxx>`
-- Use only lowercase letters, numbers, and underscores in `xxx` (e.g. `screw_front`)
+- Follow the naming convention above for `xxx` (lowercase letters, numbers, underscores)
 - Keep token naming consistent with how you plan to write prompts in Step 3
 
 For example, after training the `screw_front` and `screw_up` LoRAs:
