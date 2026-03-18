@@ -6,7 +6,7 @@ PipelineParams:
   convert_SHs_python: True
 
 ModelParams:
-  workspace: light_diode_green_screw
+  workspace: green_led
   sh_degree: 0
   bg_aug_ratio: 0.5
 
