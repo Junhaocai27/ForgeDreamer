@@ -341,7 +341,8 @@ where `<N>` is the total number of LoRA tuning steps, controlled by the `--max_t
 
 ### Step 3 — Configure the YAML file
 
-Edit `configs/screw.yaml` (or create your own config based on it) and update the following key fields:
+Edit `configs/screw.yaml` (or create your own config based on it) and update the following key fields.  
+If you already have the base SD model downloaded locally, you can change only `GuidanceParams.model_key` to your local model path and keep all other YAML content unchanged.
 
 ```yaml
 GuidanceParams:
