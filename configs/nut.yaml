@@ -6,7 +6,7 @@ PipelineParams:
   convert_SHs_python: True
 
 ModelParams:
-  workspace: nut_AAAI_dinamic_pjh_test_new_6
+  workspace: nut_screw
   sh_degree: 0
   bg_aug_ratio: 0.5
 

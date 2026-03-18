@@ -6,7 +6,7 @@ PipelineParams:
   convert_SHs_python: True
 
 ModelParams:
-  workspace: resistor_AAAI10
+  workspace: resistor_screw
   sh_degree: 0
   bg_aug_ratio: 0.5
 

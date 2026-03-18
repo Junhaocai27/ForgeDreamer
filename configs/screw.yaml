@@ -6,7 +6,7 @@ PipelineParams:
   convert_SHs_python: True
 
 ModelParams:
-  workspace: screw_cvpr_re_4_check
+  workspace: screw_alias
   sh_degree: 0
   bg_aug_ratio: 0.5
 
